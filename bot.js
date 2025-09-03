@@ -46,6 +46,15 @@ client.on('interactionCreate', async interaction => {
       case 'check-verification':
         await handleCheckVerification(interaction, pendingVerifications);
         break;
+      case 'test-verify':
+        await handleTestVerify(interaction, pendingVerifications);
+        break;
+      case 'simulate-webhook':
+        await handleSimulateWebhook(interaction, pendingVerifications);
+        break;
+      case 'list-pending':
+        await handleListPending(interaction, pendingVerifications);
+        break;
     }
   } catch (error) {
     console.error(`Error handling command ${commandName}:`, error);

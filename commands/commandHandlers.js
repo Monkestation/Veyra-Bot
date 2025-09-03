@@ -36,7 +36,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
   // Check daily limit
   const limitExceeded = await checkDailyLimit();
   if (limitExceeded) {
-    // Create pending verification request
+    // Create pending verification request for manual approval
     const verificationId = uuidv4();
     pendingVerifications.set(verificationId, {
       discordId,
@@ -44,7 +44,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
       userId: interaction.user.id,
       username: interaction.user.username,
       timestamp: Date.now(),
-      type: 'manual_approval'
+      type: 'manual_approval_pending'
     });
 
     // Send to admin channel
@@ -52,7 +52,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
     const embed = new EmbedBuilder()
       .setColor(0xFF6B6B)
       .setTitle('Verification Approval Required')
-      .setDescription('Daily verification limit reached')
+      .setDescription('Daily verification limit reached - Admin approval needed')
       .addFields(
         { name: 'Discord User', value: `<@${discordId}> (${interaction.user.username})`, inline: true },
         { name: 'CKEY', value: ckey, inline: true },
@@ -66,12 +66,12 @@ async function handleVerify(interaction, pendingVerifications, client) {
     });
 
     return await interaction.editReply({
-      content: 'Daily verification limit reached. Your request has been sent to administrators for approval.',
+      content: 'Daily verification limit reached. Your request has been sent to administrators for approval. You will receive a DM with your verification link once approved.',
       ephemeral: true
     });
   }
 
-  // Create iDenfy verification
+  // Create iDenfy verification directly (normal flow)
   try {
     const verification = await createIdenfyVerification(discordId, ckey);
     
@@ -108,6 +108,97 @@ async function handleVerify(interaction, pendingVerifications, client) {
       content: 'Failed to create verification session. Please try again later.',
       ephemeral: true
     });
+  }
+}
+
+async function handleManualApproval(verificationId, pendingVerifications, client, adminUser) {
+  const pendingVerification = pendingVerifications.get(verificationId);
+  
+  if (!pendingVerification) {
+    throw new Error('Verification not found');
+  }
+
+  if (pendingVerification.type !== 'manual_approval_pending') {
+    throw new Error('Verification is not awaiting manual approval');
+  }
+
+  // Create iDenfy verification now that it's approved
+  try {
+    const verification = await createIdenfyVerification(
+      pendingVerification.discordId, 
+      pendingVerification.ckey
+    );
+    
+    // Update the pending verification with iDenfy details
+    pendingVerifications.delete(verificationId); // Remove old entry
+    pendingVerifications.set(verification.scanRef, {
+      ...pendingVerification,
+      type: 'idenfy',
+      clientId: verification.clientId,
+      sessionToken: verification.sessionToken,
+      manuallyApproved: true,
+      approvedBy: adminUser.id,
+      approvedAt: Date.now()
+    });
+
+    // Try to DM the user with their iDenfy link
+    try {
+      const user = await client.users.fetch(pendingVerification.discordId);
+      const embed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setTitle('Verification Approved!')
+        .setDescription('Your verification has been approved by an administrator. Please complete the identity verification process using the link below.')
+        .addFields(
+          { name: 'CKEY', value: pendingVerification.ckey, inline: true },
+          { name: 'Status', value: 'Approved - Complete iDenfy', inline: true },
+          { name: 'Scan Reference', value: verification.scanRef, inline: true },
+          { name: 'Approved By', value: `${adminUser.username}`, inline: true }
+        )
+        .setFooter({ text: 'This link expires in 1 hour' })
+        .setTimestamp();
+
+      await user.send({
+        content: `Your verification has been approved! Please complete your verification here: ${verification.verificationUrl}`,
+        embeds: [embed]
+      });
+
+      console.log(`Successfully sent iDenfy link to user ${pendingVerification.username} (${pendingVerification.discordId})`);
+    } catch (dmError) {
+      console.error('Failed to DM user with iDenfy link:', dmError);
+      
+      // Try to post in verification channel as fallback
+      try {
+        const verificationChannel = await client.channels.fetch(config.VERIFICATION_CHANNEL_ID);
+        const fallbackEmbed = new EmbedBuilder()
+          .setColor(0xFFAA00)
+          .setTitle('⚠️ Unable to DM User - Manual Contact Required')
+          .setDescription('User approval completed but DM failed. Please contact user manually.')
+          .addFields(
+            { name: 'User', value: `<@${pendingVerification.discordId}>`, inline: true },
+            { name: 'CKEY', value: pendingVerification.ckey, inline: true },
+            { name: 'Verification Link', value: verification.verificationUrl, inline: false },
+            { name: 'Scan Reference', value: verification.scanRef, inline: true }
+          )
+          .setTimestamp();
+
+        await verificationChannel.send({
+          content: `<@${pendingVerification.discordId}> - Your verification was approved but we couldn't DM you.`,
+          embeds: [fallbackEmbed]
+        });
+      } catch (channelError) {
+        console.error('Failed to post fallback message in verification channel:', channelError);
+      }
+    }
+
+    return {
+      success: true,
+      verificationUrl: verification.verificationUrl,
+      scanRef: verification.scanRef,
+      userNotified: true // We attempted to notify (success handled above)
+    };
+  } catch (error) {
+    console.error('Failed to create iDenfy verification after approval:', error);
+    throw error;
   }
 }
 
@@ -200,7 +291,26 @@ async function handleCheckVerification(interaction, pendingVerifications) {
       });
     }
 
-    // If this is a manual-approval flow, submit immediately
+    // Handle manual approval pending state
+    if (pending.type === 'manual_approval_pending') {
+      const embed = new EmbedBuilder()
+        .setColor(0xFFFF00)
+        .setTitle('Manual Approval - Awaiting Admin Review')
+        .setDescription('Your verification is waiting for administrator approval due to daily limits.')
+        .addFields(
+          { name: 'Discord User', value: `<@${pending.discordId}> (${pending.username})`, inline: true },
+          { name: 'CKEY', value: pending.ckey, inline: true },
+          { name: 'Status', value: 'Awaiting Admin Approval ⏳', inline: true },
+          { name: 'Verification ID', value: actualScanRef, inline: true },
+          { name: 'Submitted At', value: new Date(pending.timestamp).toLocaleString(), inline: true },
+          { name: 'Next Step', value: 'You will receive a DM with your iDenfy link after approval', inline: false }
+        )
+        .setTimestamp();
+
+      return interaction.editReply({ embeds: [embed], ephemeral: true });
+    }
+
+    // Legacy manual approval flow (immediate submission)
     if (pending.type === 'manual_approval') {
       try {
         const result = await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
@@ -262,6 +372,17 @@ async function handleCheckVerification(interaction, pendingVerifications) {
       { name: 'CKEY', value: pending.ckey, inline: true },
       { name: 'Created', value: new Date(pending.timestamp).toLocaleString(), inline: true }
     );
+
+    // Show if this was manually approved
+    if (pending.manuallyApproved) {
+      embed.addFields({ name: 'Approval Method', value: 'Manually Approved by Admin', inline: true });
+      if (pending.approvedBy && pending.approvedAt) {
+        embed.addFields(
+          { name: 'Approved By', value: `<@${pending.approvedBy}>`, inline: true },
+          { name: 'Approved At', value: new Date(pending.approvedAt).toLocaleString(), inline: true }
+        );
+      }
+    }
 
     if (status?.reasonCode) {
       embed.addFields({ name: 'Reason Code', value: String(status.reasonCode), inline: true });
@@ -330,5 +451,6 @@ async function handleCheckVerification(interaction, pendingVerifications) {
 module.exports = {
   handleVerify,
   handleDebugVerify,
-  handleCheckVerification
+  handleCheckVerification,
+  handleManualApproval
 };

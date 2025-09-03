@@ -13,7 +13,7 @@
     "test-webhook": "node test/standaloneTest.js webhook"
   },
   "keywords": ["discord", "bot", "verification", "idenfy", "byond"],
-  "author": "Your Name",
+  "author": "dwasint",
   "license": "MIT",
   "dependencies": {
     "discord.js": "^14.0.0",

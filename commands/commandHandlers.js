@@ -11,6 +11,23 @@ async function handleVerify(interaction, pendingVerifications, client) {
   const ckey = interaction.options.getString('ckey');
   const discordId = interaction.user.id;
 
+  // Check if user is vetted through API
+  try {
+    const isVetted = await checkUserVetted(discordId);
+    if (!isVetted) {
+      return await interaction.editReply({
+        content: 'Access denied. You must be vetted to use the verification system.',
+        ephemeral: true
+      });
+    }
+  } catch (error) {
+    console.error('Error checking vetted status:', error);
+    return await interaction.editReply({
+      content: 'Unable to verify your vetted status. Please try again later.',
+      ephemeral: true
+    });
+  }
+
   // Check if user already has a pending verification
   if (pendingVerifications.has(discordId)) {
     return await interaction.editReply({
@@ -19,19 +36,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
     });
   }
 
-  // Check existing verification
-  try {
-    const existing = await getExistingVerification(discordId);
-    if (existing) {
-      return await interaction.editReply({
-        content: `You are already verified with ckey: ${existing.ckey}`,
-        ephemeral: true
-      });
-    }
-  } catch (error) {
-    console.error('Error checking existing verification:', error);
-    // Continue with verification process
-  }
+  // Check existing verification and scan_ref status
 
   // Check daily limit
   const limitExceeded = await checkDailyLimit();

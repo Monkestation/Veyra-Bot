@@ -5,6 +5,35 @@ const config = require('../config/config');
 const { submitVerification } = require('../services/apiClient');
 const { deleteIdenfyData } = require('../services/idenfyService');
 
+// Helper function to retry deletion with initial delay and retries
+async function retryDeleteIdenfyData(scanRef, maxRetries = 12, baseDelay = 10000, initialDelay = 5000) {
+  // Wait 5 seconds before first attempt to give iDenfy time to finish processing
+  console.log(`Waiting ${initialDelay/1000}s before attempting to delete iDenfy data for ${scanRef}...`);
+  await new Promise(resolve => setTimeout(resolve, initialDelay));
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      await deleteIdenfyData(scanRef);
+      console.log(`Successfully deleted iDenfy data for ${scanRef} on attempt ${attempt + 1}`);
+      return true;
+    } catch (error) {
+      const isProcessingError = error.message.includes('processing state');
+      
+      if (!isProcessingError || attempt === maxRetries - 1) {
+        // If it's not a processing error or we've exhausted retries, log and give up
+        console.error(`Failed to delete iDenfy data for ${scanRef} after ${attempt + 1} attempts:`, error.message);
+        return false;
+      }
+      
+      // Wait before retrying (10s, 20s, 30s, etc.)
+      const delay = baseDelay * (attempt + 1);
+      console.log(`Deletion failed for ${scanRef} (attempt ${attempt + 1}/${maxRetries}): ${error.message}. Retrying in ${delay/1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  return false;
+}
+
 function createWebhookServer(client, pendingVerifications) {
   const webhookApp = express();
   webhookApp.use(bodyParser.json());
@@ -63,7 +92,11 @@ function createWebhookServer(client, pendingVerifications) {
               )
               .setTimestamp();
             
-            await deleteIdenfyData(scanRef);
+            // Start retry deletion in background - don't await it
+            retryDeleteIdenfyData(scanRef).catch(error => {
+              console.error(`Background deletion retry failed for ${scanRef}:`, error);
+            });
+            
             await channel.send({ embeds: [logEmbed] });
           }
 
@@ -116,12 +149,10 @@ function createWebhookServer(client, pendingVerifications) {
 
         await user.send({ embeds: [embed] });
         
-        // Clean up iDenfy data
-        try {
-          await deleteIdenfyData(scanRef);
-        } catch (deleteError) {
-          console.error(`Failed to delete iDenfy data for failed verification ${scanRef}:`, deleteError);
-        }
+        // Clean up iDenfy data with retry
+        retryDeleteIdenfyData(scanRef).catch(error => {
+          console.error(`Background deletion retry failed for failed verification ${scanRef}:`, error);
+        });
       } else if (overallStatus === 'REVIEWING') {
         // Still under review - don't remove from pending
         console.log(`Verification ${scanRef} is still under review`);

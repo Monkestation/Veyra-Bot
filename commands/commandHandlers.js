@@ -11,19 +11,29 @@ async function handleVerify(interaction, pendingVerifications, client) {
   const ckey = interaction.options.getString('ckey');
   const discordId = interaction.user.id;
 
-  // Check if user is vetted through API
+  // Check if user is vetted and verification status
   try {
-    const isVetted = await checkUserVetted(discordId);
-    if (!isVetted) {
+    const existing = await getExistingVerification(discordId);
+    if (!existing || !existing.verified_flags || !existing.verified_flags.vetted) {
       return await interaction.editReply({
         content: 'Access denied. You must be vetted to use the verification system.',
         ephemeral: true
       });
     }
+    
+    // Check if they already have scan_ref (already ID verified)
+    if (existing.verified_flags.scan_ref) {
+      return await interaction.editReply({
+        content: `You are already ID verified with ckey: ${existing.ckey}`,
+        ephemeral: true
+      });
+    }
+    // If they have vetted flag but no scan_ref, they can proceed with ID verification
+    
   } catch (error) {
-    console.error('Error checking vetted status:', error);
+    console.error('Error checking verification status:', error);
     return await interaction.editReply({
-      content: 'Unable to verify your vetted status. Please try again later.',
+      content: 'Unable to verify your status. Please try again later.',
       ephemeral: true
     });
   }

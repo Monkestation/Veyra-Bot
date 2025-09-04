@@ -14,15 +14,19 @@ function createWebhookServer(client, pendingVerifications) {
     try {
       const { scanRef, status, platform } = req.body;
       
+      // Extract the actual status from the status object
+      const overallStatus = status?.overall;
+      
       const pending = pendingVerifications.get(scanRef);
       if (!pending) {
         console.log(`No pending verification found for scanRef: ${scanRef}`);
         return res.status(200).send('OK');
       }
 
-      console.log(`Received iDenfy webhook for ${scanRef}: ${status}`);
+      console.log(`Received iDenfy webhook for ${scanRef}: ${overallStatus}`);
+      console.log('Full status object:', JSON.stringify(status, null, 2));
 
-      if (status === 'APPROVED') {
+      if (overallStatus === 'APPROVED') {
         // Verification successful
         try {
           await submitVerification(pending.discordId, pending.ckey, false, scanRef);
@@ -82,17 +86,30 @@ function createWebhookServer(client, pendingVerifications) {
             ]
           });
         }
-      } else if (status === 'DENIED' || status === 'EXPIRED' || status === 'SUSPECTED') {
+      } else if (overallStatus === 'DENIED' || overallStatus === 'EXPIRED' || overallStatus === 'SUSPECTED') {
         // Verification failed - remove from pending
         pendingVerifications.delete(scanRef);
         
         const user = await client.users.fetch(pending.userId);
+        
+        // Provide more detailed failure information
+        let failureReason = 'Unknown reason';
+        let description = 'Your identity verification was not successful.';
+        
+        if (status?.denyReasons && status.denyReasons.length > 0) {
+          failureReason = status.denyReasons.join(', ');
+          description += ` Reason(s): ${failureReason}`;
+        } else if (status?.suspicionReasons && status.suspicionReasons.length > 0) {
+          failureReason = status.suspicionReasons.join(', ');
+          description += ` Issue(s): ${failureReason}`;
+        }
+        
         const embed = new EmbedBuilder()
           .setColor(0xFF0000)
           .setTitle('Verification Failed')
-          .setDescription('Your identity verification was not successful.')
+          .setDescription(description)
           .addFields(
-            { name: 'Status', value: status, inline: true },
+            { name: 'Status', value: overallStatus, inline: true },
             { name: 'Scan Reference', value: scanRef, inline: true }
           )
           .setTimestamp();
@@ -105,6 +122,25 @@ function createWebhookServer(client, pendingVerifications) {
         } catch (deleteError) {
           console.error(`Failed to delete iDenfy data for failed verification ${scanRef}:`, deleteError);
         }
+      } else if (overallStatus === 'REVIEWING') {
+        // Still under review - don't remove from pending
+        console.log(`Verification ${scanRef} is still under review`);
+        
+        const user = await client.users.fetch(pending.userId);
+        const embed = new EmbedBuilder()
+          .setColor(0xFFFF00)
+          .setTitle('Verification Under Review')
+          .setDescription('Your identity verification is being reviewed. You will be notified once the review is complete.')
+          .addFields(
+            { name: 'Status', value: overallStatus, inline: true },
+            { name: 'Scan Reference', value: scanRef, inline: true }
+          )
+          .setTimestamp();
+
+        await user.send({ embeds: [embed] });
+      } else {
+        // Handle other statuses (ACTIVE, DELETED, ARCHIVED)
+        console.log(`Received unexpected status for ${scanRef}: ${overallStatus}`);
       }
 
       res.status(200).send('OK');

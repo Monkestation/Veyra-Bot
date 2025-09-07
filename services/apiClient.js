@@ -48,7 +48,10 @@ async function authenticateAPI() {
   }
 }
 
-// Check if daily verification limit is exceeded
+/**
+ * Check if daily verification limit is exceeded
+ * @returns {Promise<boolean}
+ */
 async function checkDailyLimit() {
   try {
     const response = await api.get('/api/analytics');
@@ -60,7 +63,14 @@ async function checkDailyLimit() {
   }
 }
 
-// Submit verification to API
+/**
+ * Submits user verification data to the API.
+ * @param {string} discordId The user's Discord ID.
+ * @param {string} ckey The user's Ckey.
+ * @param {boolean} [debugMode=false] A flag to enable debug verification method.
+ * @param {string} [scan_ref] A reference ID for the verification scan.
+ * @returns {Promise<VerificationSuccessResponse>}
+ */
 async function submitVerification(discordId, ckey, debugMode = false, scan_ref) {
   const verificationData = {
     discord_id: discordId,
@@ -87,6 +97,11 @@ async function submitVerification(discordId, ckey, debugMode = false, scan_ref) 
 }
 
 // Get existing verification
+/**
+ * Returns 
+ * @param {string} discordId The user's Discord ID
+ * @returns {Promise<VerificationGetResponse | null>}
+ */
 async function getExistingVerification(discordId) {
   try {
     const response = await api.get(`/api/v1/verify/${discordId}`);

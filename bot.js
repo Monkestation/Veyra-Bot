@@ -5,6 +5,7 @@ const { authenticateAPI } = require('./services/apiClient');
 const commands = require('./commands/commands');
 const { handleVerify, handleDebugVerify, handleCheckVerification } = require('./commands/commandHandlers');
 const { createWebhookServer } = require('./webhook/webhookServer');
+const { handleTestVerify, handleSimulateWebhook, handleListPending } = require('./commands/testCommandHandlers');
 
 // Initialize persistent storage for pending verifications
 const pendingVerifications = new PersistentMap();
@@ -88,7 +89,7 @@ client.once('ready', async () => {
   // Authenticate with API
   try {
     await authenticateAPI();
-  } catch (error) {
+  } catch {
     console.error('Failed to authenticate with API. Bot will not function properly.');
     process.exit(1);
   }

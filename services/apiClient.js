@@ -50,7 +50,7 @@ async function authenticateAPI() {
 
 /**
  * Check if daily verification limit is exceeded
- * @returns {Promise<boolean}
+ * @returns {Promise<boolean>}
  */
 async function checkDailyLimit() {
   try {
@@ -96,9 +96,9 @@ async function submitVerification(discordId, ckey, debugMode = false, scan_ref) 
   }
 }
 
-// Get existing verification
 /**
- * Returns 
+/**
+ * Returns existing verification data for a Discord user, or null if not found.
  * @param {string} discordId The user's Discord ID
  * @returns {Promise<VerificationGetResponse | null>}
  */

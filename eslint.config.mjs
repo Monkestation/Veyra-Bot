@@ -3,28 +3,37 @@ import globals from "globals";
 import json from "@eslint/json";
 import markdown from "@eslint/markdown";
 import { defineConfig } from "eslint/config";
-
+import { readFileSync } from "node:fs";
 export default defineConfig([
+  {
+    ignores: 
+      // HOLY SHIT DUDE I LOVE THIS SO MUCH!
+      readFileSync(".eslintignore", { encoding: "utf8" }).trim().split(/\r?\n/),
+    
+  },
   {
     files: ["**/*.{js,mjs,cjs}"],
     plugins: { js },
     rules: js.configs.recommended.rules,
-    languageOptions: { globals: globals.node }
+    languageOptions: { globals: globals.node },
   },
   {
     files: ["**/*.js"],
-    languageOptions: { sourceType: "commonjs" }
+    languageOptions: { sourceType: "commonjs" },
   },
   {
     files: ["**/*.json"],
     plugins: { json },
     language: "json/json",
-    rules: json.configs.recommended.rules
+    rules: json.configs.recommended.rules,
   },
   {
     files: ["**/*.md"],
     plugins: { markdown },
     language: "markdown/gfm",
-    rules: markdown.configs.recommended.rules
+    rules: Object.assign(
+      {},
+      ...markdown.configs.recommended.flatMap((e) => e.rules)
+    ),
   },
 ]);

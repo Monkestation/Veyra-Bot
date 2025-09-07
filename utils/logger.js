@@ -4,7 +4,7 @@ const { join: pathJoin } = require("node:path");
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const Sentry = require('@sentry/node');
 const config = require("../config/config");
-const SentryTransport = require('winston-transport-sentry-node').default;
+const SentryTransport = require('./WinstonSentryTransport');
 
 if (config.SENTRY_DSN) {
   Sentry.init({

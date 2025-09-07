@@ -104,9 +104,8 @@ client.once('ready', async () => {
     return process.exit(1);
   }
 
-  // Check if we have permissions to assign roles to users
   const primaryGuild = client.guilds.resolve(config.GUILD_ID);
-
+  
   if (!primaryGuild) {
     console.error("Bot is not in primary guild, exiitng...");
     return process.exit(1);
@@ -194,6 +193,9 @@ process.on('SIGTERM', async () => {
 });
 
 async function preflight() {
+  /**
+   * @type {(keyof import("./config/config"))[]}
+   */
   const requiredKeys = [
     "DISCORD_TOKEN",
     "API_USERNAME",
@@ -201,7 +203,7 @@ async function preflight() {
     "IDENFY_API_KEY",
     "IDENFY_API_SECRET",
     "GUILD_ID",
-    "VERIFICATION_CHANNEL_ID"
+    "VERIFICATION_CHANNEL_ID",
   ];
 
   const missingKeys = requiredKeys.filter((key) => !config[key]);

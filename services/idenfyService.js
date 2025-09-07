@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../config/config');
+const logger = require('../utils/logger');
 
 // Create iDenfy verification session
 async function createIdenfyVerification(discordId, ckey) {
@@ -19,8 +20,8 @@ async function createIdenfyVerification(discordId, ckey) {
     };
 
     if (config.DEBUG_MODE) {
-      console.log('iDenfy Request Body:', JSON.stringify(requestBody, null, 2));
-      console.log('Using API Key:', config.IDENFY_API_KEY?.substring(0, 8) + '...');
+      logger.info('iDenfy Request Body:', JSON.stringify(requestBody, null, 2));
+      logger.info('Using API Key:', config.IDENFY_API_KEY?.substring(0, 8) + '...');
     }
 
     const response = await axios.post(`${config.IDENFY_BASE_URL}/api/v2/token`, requestBody, {
@@ -35,7 +36,7 @@ async function createIdenfyVerification(discordId, ckey) {
     });
 
     if (config.DEBUG_MODE) {
-      console.log('iDenfy Response:', JSON.stringify(response.data, null, 2));
+      logger.info('iDenfy Response:', JSON.stringify(response.data, null, 2));
     }
 
     return {
@@ -45,11 +46,11 @@ async function createIdenfyVerification(discordId, ckey) {
       verificationUrl: `${config.IDENFY_BASE_URL}/api/v2/redirect?authToken=${response.data.authToken}`
     };
   } catch (error) {
-    console.error('Failed to create iDenfy verification:', error.response?.data || error.message);
+    logger.error('Failed to create iDenfy verification:', error.response?.data || error.message);
     if (config.DEBUG_MODE && error.response) {
-      console.error('Response status:', error.response.status);
-      console.error('Response headers:', error.response.headers);
-      console.error('Response data:', error.response.data);
+      logger.error('Response status:', error.response.status);
+      logger.error('Response headers:', error.response.headers);
+      logger.error('Response data:', error.response.data);
     }
     throw error;
   }
@@ -73,7 +74,7 @@ async function getIdenfyVerificationStatus(scanRef) {
     
     return response.data;
   } catch (error) {
-    console.error('Failed to get iDenfy verification status:', error.response?.data || error.message);
+    logger.error('Failed to get iDenfy verification status:', error.response?.data || error.message);
     throw error;
   }
 }
@@ -99,9 +100,9 @@ async function deleteIdenfyData(scanRef) {
       }
     }
 
-    console.log(`Successfully deleted iDenfy data for scanRef: ${scanRef}`);
+    logger.info(`Successfully deleted iDenfy data for scanRef: ${scanRef}`);
   } catch (error) {
-    console.error(`Failed to delete iDenfy data for scanRef ${scanRef}:`, error);
+    logger.error(`Failed to delete iDenfy data for scanRef ${scanRef}:`, error);
     throw error;
   }
 }

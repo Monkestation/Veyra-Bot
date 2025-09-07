@@ -1,5 +1,6 @@
 const axios = require('axios');
 const config = require('../config/config');
+const logger = require('../utils/logger');
 
 let jwtToken = null;
 
@@ -41,9 +42,9 @@ async function authenticateAPI() {
       password: config.API_PASSWORD
     });
     jwtToken = response.data.token;
-    console.log('Successfully authenticated with API');
+    logger.info('Successfully authenticated with API');
   } catch (error) {
-    console.error('Failed to authenticate with API:', error.message);
+    logger.error('Failed to authenticate with API:', error.message);
     throw error;
   }
 }
@@ -58,7 +59,7 @@ async function checkDailyLimit() {
     const { recent_verifications } = response.data;
     return recent_verifications >= config.DAILY_VERIFICATION_LIMIT;
   } catch (error) {
-    console.error('Failed to check daily limit:', error.message);
+    logger.error('Failed to check daily limit:', error.message);
     return false; // Allow verification on error
   }
 }
@@ -91,7 +92,7 @@ async function submitVerification(discordId, ckey, debugMode = false, scan_ref) 
     const response = await api.post('/api/v1/verify', verificationData);
     return response.data;
   } catch (error) {
-    console.error('Failed to submit verification:', error.message);
+    logger.error('Failed to submit verification:', error.message);
     throw error;
   }
 }

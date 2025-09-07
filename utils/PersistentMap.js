@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const config = require('../config/config');
+const logger = require('./logger');
 
 // File path for persistent storage
 const PENDING_VERIFICATIONS_FILE = path.join(__dirname, '..', 'data', 'pending_verifications.json');
@@ -26,10 +27,10 @@ async function savePendingVerifications(dataMap) {
     await fs.rename(tempFile, PENDING_VERIFICATIONS_FILE);
     
     if (config.DEBUG_MODE) {
-      console.log(`Saved ${dataMap.size} pending verifications to disk`);
+      logger.info(`Saved ${dataMap.size} pending verifications to disk`);
     }
   } catch (error) {
-    console.error('Failed to save pending verifications:', error.message);
+    logger.error('Failed to save pending verifications:', error.message);
     
     // Try to clean up temp file if it exists
     try {
@@ -100,7 +101,7 @@ class PersistentMap extends Map {
         await fs.access(PENDING_VERIFICATIONS_FILE);
       } catch (error) {
         if (error.code === 'ENOENT') {
-          console.log('No pending verifications file found, starting fresh');
+          logger.info('No pending verifications file found, starting fresh');
           return;
         }
         throw error;
@@ -110,7 +111,7 @@ class PersistentMap extends Map {
       
       // Handle empty file
       if (!data.trim()) {
-        console.log('Pending verifications file is empty, starting fresh');
+        logger.info('Pending verifications file is empty, starting fresh');
         return;
       }
       
@@ -118,13 +119,13 @@ class PersistentMap extends Map {
       try {
         pendingObject = JSON.parse(data);
       } catch (parseError) {
-        console.error('Failed to parse pending verifications JSON:', parseError.message);
-        console.log('Creating backup of corrupted file and starting fresh');
+        logger.error('Failed to parse pending verifications JSON:', parseError.message);
+        logger.info('Creating backup of corrupted file and starting fresh');
         
         // Create backup of corrupted file
         const backupFile = `${PENDING_VERIFICATIONS_FILE}.backup.${Date.now()}`;
         await fs.copyFile(PENDING_VERIFICATIONS_FILE, backupFile);
-        console.log(`Corrupted file backed up to: ${backupFile}`);
+        logger.info(`Corrupted file backed up to: ${backupFile}`);
         
         return;
       }
@@ -151,7 +152,7 @@ class PersistentMap extends Map {
             !verification.ckey || 
             !verification.timestamp ||
             !verification.type) {
-          console.warn(`Skipping invalid verification entry for scanRef: ${scanRef}`);
+          logger.warn(`Skipping invalid verification entry for scanRef: ${scanRef}`);
           skippedCount++;
           continue;
         }
@@ -160,14 +161,14 @@ class PersistentMap extends Map {
         const age = now - verification.timestamp;
         
         if (age > maxAge) {
-          console.log(`Skipping expired verification for scanRef: ${scanRef} (${Math.round(age / (60 * 60 * 1000))}h old)`);
+          logger.info(`Skipping expired verification for scanRef: ${scanRef} (${Math.round(age / (60 * 60 * 1000))}h old)`);
           skippedCount++;
           continue;
         }
         
         // Validate verification type
         if (!['idenfy', 'manual_approval'].includes(verification.type)) {
-          console.warn(`Skipping verification with unknown type: ${verification.type} for scanRef: ${scanRef}`);
+          logger.warn(`Skipping verification with unknown type: ${verification.type} for scanRef: ${scanRef}`);
           skippedCount++;
           continue;
         }
@@ -177,21 +178,21 @@ class PersistentMap extends Map {
         loadedCount++;
       }
       
-      console.log(`Loaded ${loadedCount} pending verifications${skippedCount > 0 ? `, skipped ${skippedCount} invalid/expired entries` : ''}`);
+      logger.info(`Loaded ${loadedCount} pending verifications${skippedCount > 0 ? `, skipped ${skippedCount} invalid/expired entries` : ''}`);
       
       // Optional: Log what was loaded for debugging
       if (config.DEBUG_MODE) {
-        console.log('Loaded pending verifications:', Array.from(this.keys()));
+        logger.info('Loaded pending verifications:', Array.from(this.keys()));
       }
 
       // If we skipped any entries, save the cleaned up version
       if (skippedCount > 0) {
-        console.log('Saving cleaned up pending verifications...');
+        logger.info('Saving cleaned up pending verifications...');
         await savePendingVerifications(this);
       }
     } catch (error) {
-      console.error('Error loading pending verifications:', error.message);
-      console.log('Starting with empty pending verifications');
+      logger.error('Error loading pending verifications:', error.message);
+      logger.info('Starting with empty pending verifications');
       
       // Clear any partial data that might have been loaded
       this.clear();
@@ -213,12 +214,12 @@ class PersistentMap extends Map {
       if (now - verification.timestamp > MAX_AGE) {
         this.delete(scanRef);
         cleanedCount++;
-        console.log(`Cleaned up expired verification: ${scanRef} (${verification.type})`);
+        logger.info(`Cleaned up expired verification: ${scanRef} (${verification.type})`);
       }
     }
     
     if (cleanedCount > 0) {
-      console.log(`Cleanup completed: removed ${cleanedCount} expired pending verifications`);
+      logger.info(`Cleanup completed: removed ${cleanedCount} expired pending verifications`);
     }
   }
 }

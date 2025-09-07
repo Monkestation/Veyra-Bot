@@ -35,19 +35,21 @@ async function main() {
       case 'suspected':
         await testScenarios.suspected(discordId, ckey);
         break;
-      case 'webhook':
+      case 'webhook': {
         const scanRef = process.argv[5] || 'test-scan-ref-' + Date.now();
         const status = process.argv[6] || 'APPROVED';
         await simulateWebhookCall(scanRef, status);
         break;
-      default:
+      }
+      default: {
         console.log('Unknown command. Available commands:');
         console.log('  approved   - Test approved verification');
-        console.log('  denied     - Test denied verification'); 
+        console.log('  denied     - Test denied verification');
         console.log('  expired    - Test expired verification');
         console.log('  suspected  - Test suspected verification');
         console.log('  webhook    - Simulate webhook only');
         console.log('\nUsage: node test/standaloneTest.js <command> [discordId] [ckey] [scanRef] [status]');
+      }
     }
   } else {
     // Interactive mode

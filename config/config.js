@@ -14,5 +14,7 @@ module.exports = {
   DEBUG_MODE: process.env.DEBUG_MODE === 'true',
   GUILD_ID: process.env.GUILD_ID,
   WEBHOOK_PORT: process.env.WEBHOOK_PORT || 3001,
-  VERIFIED_ROLE_ID: process.env.VERIFIED_ROLE_ID
+  VERIFIED_ROLE_ID: process.env.VERIFIED_ROLE_ID,
+  SENTRY_DSN: process.env.SENTRY_DSN,
+  NEW_LOGGER: process.env.NEW_LOGGER,
 };

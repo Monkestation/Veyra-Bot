@@ -20,14 +20,19 @@ if (config.DEBUG_MODE) {
   console.warn(`Debug mode enabled${config.SENTRY_DSN && !process.env.SENTRY_DEBUG ? "; Sentry debug can be enabled with SENTRY_DEBUG env.": ""}`);
 }
 
-if (config.NEW_LOGGER) {
+if (config.LOGGER_NEW) {
+  const logPath = pathJoin(process.cwd(), "logs", `${IS_PRODUCTION ? "prod" : "dev"}_${getFilenameFriendlyUTCDate()}.json`);
+  console.log(`"Logging (JSON Lines) to ${logPath}"`);
   const transports = [];
 
   transports.push(
     new winston.transports.File({
-      filename: pathJoin(process.cwd(), "logs", `${IS_PRODUCTION ? "prod" : "dev"}_${getFilenameFriendlyUTCDate()}.json`),
-      format: winston.format.json(),
-      handleExceptions: true
+      filename: logPath,
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+      ),
+      handleExceptions: true,
     })
   );
 
@@ -42,39 +47,36 @@ if (config.NEW_LOGGER) {
       })
     );
   }
-  if (IS_PRODUCTION) {
+  if (config.LOGGER_PRETTY) {
+    const { inspect } = require("util");
+    transports.push(
+      new winston.transports.Console({
+        format: winston.format.combine(
+          winston.format.colorize({
+            message: true,
+            colors: {
+              info: "blue",
+            },
+            level: true
+          }),
+          winston.format.timestamp(),
+          winston.format.printf((info) => {
+            let message = info.message;
+            if (typeof message === "object") {
+              message = inspect(message, { depth: null, colors: true });
+            }
+            return `[${info.timestamp}] ${info.level}: ${message}${info.stack ? "\n" + info.stack : ""}`;
+          })
+        ),
+      })
+    );
+  } else {
     transports.push(
       new winston.transports.Console({
         format: winston.format.combine(
           winston.format.timestamp(),
           winston.format.json()
-        )
-      })
-    );
-
-    
-  } else {
-    const { inspect } = require("util");
-    transports.push(
-      new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize({
-          message: true,
-          colors: {
-            info: "blue",
-
-          },
-          level: true
-        }),
-        winston.format.timestamp(),
-        winston.format.printf((info) => {
-        let message = info.message;
-        if (typeof message === "object") {
-          message = inspect(message, { depth: null, colors: true });
-        }
-        return `[${info.timestamp}] ${info.level}: ${message}${info.stack ? "\n" + info.stack : ""}`;
-        })
-      ),
+        ),
       })
     );
   }

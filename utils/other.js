@@ -18,7 +18,22 @@ function sleep(ms) {
   return new Promise((resolve, _) => setTimeout(resolve,ms))
 }
 
+function BooleanLike(val) {
+  if (typeof val === "string") {
+    if (!Number.isNaN(parseInt(val))) {
+      return Boolean(parseInt(val))
+    } else {
+      // what the fuck am i doing
+      return (/^true|false|y(?:es)?|no?|1|0/i).test(val)
+    }
+  } else {
+    return Boolean(val);
+  }
+}
+
+
 module.exports = {
   getFilenameFriendlyUTCDate,
   sleep,
+  BooleanLike
 };

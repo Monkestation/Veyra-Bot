@@ -63,6 +63,19 @@ function createWebhookServer(client, pendingVerifications) {
           // Remove from pending after successful submission
           pendingVerifications.delete(scanRef);
           
+          try {
+            const guild = client.guilds.cache.get(config.GUILD_ID);
+            if (guild) {
+              const member = await guild.members.fetch(pending.discordId);
+              const verifiedRoleId = process.env.VERIFIED_ROLE_ID;
+              if (verifiedRoleId && member && !member.roles.cache.has(verifiedRoleId)) {
+                await member.roles.add(verifiedRoleId, 'User verified with iDenfy');
+              }
+            }
+          } catch (roleError) {
+            console.error('Failed to assign verified role:', roleError);
+          }
+      
           // Notify user
           const user = await client.users.fetch(pending.userId);
           const embed = new EmbedBuilder()

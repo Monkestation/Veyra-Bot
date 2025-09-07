@@ -33,30 +33,7 @@ A Discord bot that provides secure identity verification for Veyra. This system 
 
 ### Environment Configuration
 
-Create a `.env` file in the project root:
-
-```bash
-# Discord Bot Configuration
-DISCORD_TOKEN=your_discord_bot_token_here
-GUILD_ID=your_discord_server_id
-ADMIN_ROLE_ID=admin_role_id_for_commands
-VERIFICATION_CHANNEL_ID=channel_for_verification_logs
-
-# Backend API Configuration
-API_BASE_URL=https://your-api-server.com
-API_USERNAME=api_service_username
-API_PASSWORD=api_service_password
-
-# iDenfy Service Configuration
-IDENFY_API_KEY=your_idenfy_api_key
-IDENFY_API_SECRET=your_idenfy_api_secret
-IDENFY_BASE_URL=https://ivs.idenfy.com
-
-# Application Settings
-DAILY_VERIFICATION_LIMIT=25
-WEBHOOK_PORT=3001
-DEBUG_MODE=false
-```
+Create a copy of [`.env.example`](.env.example) and rename it to `.env`. Fill in the required values.
 
 ### Installation Steps
 

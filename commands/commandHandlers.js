@@ -4,7 +4,13 @@ const config = require('../config/config');
 const { checkDailyLimit, submitVerification, getExistingVerification } = require('../services/apiClient');
 const { createIdenfyVerification, getIdenfyVerificationStatus, deleteIdenfyData } = require('../services/idenfyService');
 
-// Handle /verify command
+/**
+ * Handle /verify command
+ * @param {import("discord.js").ChatInputCommandInteraction} interaction 
+ * @param {import("../utils/PersistentMap").PersistentMap} pendingVerifications 
+ * @param {import("discord.js").Client} client 
+ * @returns 
+ */
 async function handleVerify(interaction, pendingVerifications, client) {
   await interaction.deferReply({ ephemeral: true });
 
@@ -126,6 +132,18 @@ async function handleVerify(interaction, pendingVerifications, client) {
   }
 }
 
+/**
+ * @param {string} verificationId 
+ * @param {import("../utils/PersistentMap").PersistentMap} pendingVerifications 
+ * @param {import("discord.js").Client} client 
+ * @param {import("discord.js").User} adminUser 
+ * @returns {{
+      success: boolean,
+      verificationUrl: string,
+      scanRef: string,
+      userNotified: boolean
+    }}
+ */
 async function handleManualApproval(verificationId, pendingVerifications, client, adminUser) {
   const pendingVerification = pendingVerifications.get(verificationId);
   
@@ -217,7 +235,11 @@ async function handleManualApproval(verificationId, pendingVerifications, client
   }
 }
 
-// Handle /verify-debug command
+/**
+ * Handle /verify-debug command
+ * @param {import("discord.js").ChatInputCommandInteraction} interaction 
+ * @returns 
+ */
 async function handleDebugVerify(interaction) {
   // Check if user is admin
   if (!interaction.member.roles.cache.has(config.ADMIN_ROLE_ID)) {
@@ -258,6 +280,12 @@ async function handleDebugVerify(interaction) {
   }
 }
 
+/**
+ * @function handleCheckVerification
+ * @param {import('discord.js').CommandInteraction} interaction - The Discord interaction object representing the user's command.
+ * @param {Map<string, Object>} pendingVerifications - A map of pending verification references to their associated verification data.
+ * @returns {Promise<void>}
+ */
 async function handleCheckVerification(interaction, pendingVerifications) {
   await interaction.deferReply({ ephemeral: true });
 
@@ -427,6 +455,19 @@ async function handleCheckVerification(interaction, pendingVerifications) {
             { name: 'Data Deletion', value: 'Failed to delete iDenfy data ⚠️', inline: true },
             { name: 'Deletion Error', value: deleteError.message || 'Unknown error', inline: false }
           );
+        }
+
+        // Assign verified role
+        try {
+          const guild = interaction.guild;
+          const member = await guild.members.fetch(pending.discordId);
+          const verifiedRoleId = config.VERIFIED_ROLE_ID;
+          if (verifiedRoleId && member && !member.roles.cache.has(verifiedRoleId)) {
+            await member.roles.add(verifiedRoleId, 'User verified with iDenfy');
+            embed.addFields({ name: 'Role Assigned', value: `<@&${verifiedRoleId}>`, inline: true });
+          }
+        } catch (roleError) {
+          embed.addFields({ name: 'Role Assignment Error', value: roleError.message || 'Failed to assign role', inline: false });
         }
       } catch (error) {
         embed.setColor(0xFF8800);

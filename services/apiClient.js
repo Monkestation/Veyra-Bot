@@ -97,7 +97,6 @@ async function submitVerification(discordId, ckey, debugMode = false, scan_ref) 
 }
 
 /**
-/**
  * Returns existing verification data for a Discord user, or null if not found.
  * @param {string} discordId The user's Discord ID
  * @returns {Promise<VerificationGetResponse | null>}

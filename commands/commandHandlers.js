@@ -44,15 +44,16 @@ async function handleVerify(interaction, pendingVerifications, client) {
     });
   }
 
-  // Check if user already has a pending verification
-  if (pendingVerifications.has(discordId)) {
+  // Check if user already has a pending verification by searching through all pending verifications
+  const existingPendingVerification = Array.from(pendingVerifications.values())
+    .find(verification => verification.discordId === discordId);
+
+  if (existingPendingVerification) {
     return await interaction.editReply({
       content: 'You already have a pending verification. Please complete it first.',
       ephemeral: true
     });
   }
-
-  // Check existing verification and scan_ref status
 
   // Check daily limit
   const limitExceeded = await checkDailyLimit();

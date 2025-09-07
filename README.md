@@ -12,14 +12,29 @@ A Discord bot that provides secure identity verification for Veyra. This system 
 4. **Identity Verification**: User completes document scan and facial recognition via iDenfy
 5. **Webhook Processing**: iDenfy sends verification result to webhook endpoint which is also hosted on this bot
 7. **User Notification**: User receives confirmation via Discord response.
-8. **Data Deletion**: Data is deleted from Idenfy's system leaving only a scanRef which we can use as proof of identification in the future.
+8. **Data Deletion**: Data is deleted from iDenfy's system leaving only a scanRef which we can use as proof of identification in the future.
 
-### Verification Statuses from Idenfy
+### Verification Statuses from iDenfy
 
 - **APPROVED**: Document and facial verification passed all checks
 - **DENIED**: Verification failed due to document or facial recognition issues
 - **EXPIRED**: User did not complete verification within time limit
 - **SUSPECTED**: Potential fraud detected, requires manual review
+
+## Security Considerations
+
+### Access Control
+
+- **Role Validation**: Admin commands verify Discord role membership before execution
+- **Command Isolation**: Regular users cannot access administrative functions
+- **Audit Logging**: All admin actions logged to designated Discord channel
+
+### Privacy Compliance & Data Protection
+
+- **Data Minimization**: Only necessary identity data processed through iDenfy
+- **User Consent**: Clear verification process with user-initiated actions
+- **Data Retention**: iDenfy verification data is deleted immediately after processing
+- **Access Control**: Admin commands restricted by Discord role permissions
 
 ## Installation and Setup
 
@@ -31,16 +46,12 @@ A Discord bot that provides secure identity verification for Veyra. This system 
 - Setup instance of Veyra
 - Public webhook endpoint accessible by iDenfy set in .env file
 
-### Environment Configuration
-
-Create a copy of [`.env.example`](.env.example) and rename it to `.env`. Fill in the required values.
-
 ### Installation Steps
 
 1. **Clone and Install Dependencies**
    ```bash
-   git clone <repository-url>
-   cd discord-verification-bot
+   git clone https://github.com/Monkestation/Veyra-Bot/
+   cd veyra-bot
    npm install
    ```
 
@@ -50,7 +61,7 @@ Create a copy of [`.env.example`](.env.example) and rename it to `.env`. Fill in
    ```
 
 3. **Configure Environment**
-   - Copy `.env` template and fill in your credentials
+   - Create a copy of [`.env.example`](.env.example) and rename it to `.env`. Fill in the required values.
    - Ensure webhook endpoint is publicly accessible
    - Configure Discord bot permissions (Send Messages, Use Slash Commands)
 
@@ -74,7 +85,7 @@ Create a copy of [`.env.example`](.env.example) and rename it to `.env`. Fill in
 
 - **`/verify-debug <ckey>`**: Creates debug verification without iDenfy (admin only)
 
-### Development Commands (DEBUG_MODE=true only)
+### Development Commands (`DEBUG=true` only)
 
 - **`/test-verify <ckey> [status]`**: Creates dummy verification that auto-completes with specified result
 - **`/simulate-webhook <scan_ref> [status]`**: Manually triggers webhook for existing pending verification
@@ -105,22 +116,6 @@ node test/standaloneTest.js approved <discord_id> <ckey>
 2. **Webhook Simulation**: Directly simulates iDenfy webhook calls to test processing
 3. **End-to-End Testing**: Complete verification flow with automated result processing
 
-## Data Management
-
-### Persistent Storage
-
-- **Location**: `data/pending_verifications.json`
-- **Format**: JSON object mapping scan references to verification data
-- **Backup**: Corrupted files are automatically backed up before cleanup
-- **Cleanup**: Automatic removal of verifications older than 24 hours
-
-### Data Security
-
-- **Encryption**: All API communications use HTTPS
-- **Data Retention**: iDenfy verification data is deleted immediately after processing
-- **Veyra Access**: JWT tokens with automatic refresh on expiration
-- **Access Control**: Admin commands restricted by Discord role permissions
-
 ## API Integration
 
 ### Backend API Endpoints
@@ -142,19 +137,19 @@ The bot expects these endpoints on veyra to be working API:
 
 ### Verification Limits
 
-- **DAILY_VERIFICATION_LIMIT**: Maximum automatic verifications per day (default: 25)
+- **`DAILY_VERIFICATION_LIMIT`**: Maximum automatic verifications per day (default: 25)
 - **Behavior**: When exceeded, new verifications require manual admin approval
 - **Bypass**: Admin debug commands ignore daily limits
 
 ### Webhook Configuration
 
-- **WEBHOOK_PORT**: Port for Express webhook server (default: 3001)
+- **`WEBHOOK_PORT`**: Port for Express webhook server (default: 3001)
 - **Public Access**: Must be accessible by iDenfy servers for callbacks
 - **SSL**: Recommended for production deployments
 
 ### Debug Settings
 
-- **DEBUG_MODE**: Enables detailed logging and test commands (default: false)
+- **`DEBUG`**: Enables detailed logging and test commands (default: false)
 - **Test Commands**: Additional slash commands for development testing
 
 ## Error Handling and Recovery
@@ -164,31 +159,6 @@ The bot expects these endpoints on veyra to be working API:
 - **Signal Handling**: Responds to SIGINT and SIGTERM for clean shutdown
 - **Data Persistence**: Forces final save of all pending verifications
 - **Connection Cleanup**: Properly closes Discord and webhook connections
-
-### API Resilience
-
-- **Automatic Retry**: Failed API calls automatically retried with exponential backoff
-- **Token Refresh**: JWT authentication automatically renewed on 401 responses
-
-## Security Considerations
-
-### Access Control
-
-- **Role Validation**: Admin commands verify Discord role membership before execution
-- **Command Isolation**: Regular users cannot access administrative functions
-- **Audit Logging**: All admin actions logged to designated Discord channel
-
-### Data Protection
-
-- **Minimal Retention**: Verification data deleted immediately after processing
-- **Secure Transmission**: All external API calls use HTTPS encryption
-- **Environment Isolation**: Sensitive credentials stored in environment variables only
-
-### Privacy Compliance
-
-- **Data Minimization**: Only necessary identity data processed through iDenfy
-- **User Consent**: Clear verification process with user-initiated actions
-- **Right to Deletion**: Automatic cleanup of temporary verification data
 
 ## Troubleshooting Guide
 
@@ -214,10 +184,7 @@ The bot expects these endpoints on veyra to be working API:
 - Check user privacy settings allow messages from server members
 - Verify Discord client connection stability
 
-### Log Analysis
+## Other Notes
 
-Enable DEBUG_MODE for detailed logging including:
-- iDenfy API request/response details
-- Webhook payload processing
-- Database transaction results
-- User notification delivery status
+- Logs are located in the `logs` folder,
+- Veyra uses a json file to keep track of pending verifications across bot restarts, so data isn't lost, @ `data/pending_verifications.json`

@@ -1,6 +1,5 @@
 const fs = require('fs').promises;
 const path = require('path');
-const config = require('../config/config');
 const logger = require('./logger');
 
 // File path for persistent storage
@@ -26,16 +25,14 @@ async function savePendingVerifications(dataMap) {
     await fs.writeFile(tempFile, jsonData, 'utf8');
     await fs.rename(tempFile, PENDING_VERIFICATIONS_FILE);
     
-    if (config.DEBUG_MODE) {
-      logger.info(`Saved ${dataMap.size} pending verifications to disk`);
-    }
+    logger.debug(`Saved ${dataMap.size} pending verifications to disk`);
   } catch (error) {
     logger.error('Failed to save pending verifications:', error.message);
     
     // Try to clean up temp file if it exists
     try {
       await fs.unlink(PENDING_VERIFICATIONS_FILE + '.tmp');
-    } catch (cleanupError) {
+    } catch {
       // Ignore cleanup errors
     }
   }
@@ -180,12 +177,8 @@ class PersistentMap extends Map {
       
       logger.info(`Loaded ${loadedCount} pending verifications${skippedCount > 0 ? `, skipped ${skippedCount} invalid/expired entries` : ''}`);
       
-      // Optional: Log what was loaded for debugging
-      if (config.DEBUG_MODE) {
-        logger.info('Loaded pending verifications:', Array.from(this.keys()));
-      }
+      logger.debug('Loaded pending verifications:', Array.from(this.keys()));
 
-      // If we skipped any entries, save the cleaned up version
       if (skippedCount > 0) {
         logger.info('Saving cleaned up pending verifications...');
         await savePendingVerifications(this);
@@ -194,7 +187,6 @@ class PersistentMap extends Map {
       logger.error('Error loading pending verifications:', error.message);
       logger.info('Starting with empty pending verifications');
       
-      // Clear any partial data that might have been loaded
       this.clear();
     }
   }

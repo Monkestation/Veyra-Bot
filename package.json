@@ -1,16 +1,17 @@
 {
-  "name": "discord-verification-bot",
+  "name": "veyra-bot",
   "version": "1.0.0",
   "description": "Discord bot for BYOND verification using iDenfy",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js",
+    "start": "NODE_ENV=production node bot.js",
     "dev": "NODE_ENV=development nodemon -i logs bot.js",
     "test": "jest",
     "test-idenfy": "node test/standaloneTest.js",
     "test-approved": "node test/standaloneTest.js approved",
     "test-denied": "node test/standaloneTest.js denied",
-    "test-webhook": "node test/standaloneTest.js webhook"
+    "test-webhook": "node test/standaloneTest.js webhook",
+    "lint": "eslint"
   },
   "keywords": [
     "discord",

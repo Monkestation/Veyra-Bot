@@ -42,7 +42,7 @@ async function authenticateAPI() {
       password: config.API_PASSWORD
     });
     jwtToken = response.data.token;
-    logger.info('Successfully authenticated with API');
+    logger.debug('Successfully authenticated with API');
   } catch (error) {
     logger.error('Failed to authenticate with API:', error.message);
     throw error;

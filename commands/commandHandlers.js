@@ -126,6 +126,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
       ephemeral: true
     });
   } catch (error) {
+    logger.error(`Failed to create verification session`, error);
     await interaction.editReply({
       content: 'Failed to create verification session. Please try again later.',
       ephemeral: true

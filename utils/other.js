@@ -15,7 +15,7 @@ function getFilenameFriendlyUTCDate(date = new Date()) {
 }
 
 function sleep(ms) {
-  return new Promise((resolve, _) => setTimeout(resolve,ms))
+  return new Promise((resolve) => setTimeout(resolve,ms))
 }
 
 function BooleanLike(val) {

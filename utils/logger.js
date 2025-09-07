@@ -16,14 +16,26 @@ if (config.SENTRY_DSN) {
   });
 }
 
-if (config.DEBUG_MODE) {
+if (config.DEBUG) {
   console.warn(`Debug mode enabled${config.SENTRY_DSN && !process.env.SENTRY_DEBUG ? "; Sentry debug can be enabled with SENTRY_DEBUG env.": ""}`);
 }
 
 if (config.LOGGER_NEW) {
-  const logPath = pathJoin(process.cwd(), "logs", `${IS_PRODUCTION ? "prod" : "dev"}_${getFilenameFriendlyUTCDate()}.json`);
+  const logPath = pathJoin(
+    process.cwd(),
+    "logs",
+    `${IS_PRODUCTION ? "prod" : "dev"}_${getFilenameFriendlyUTCDate()}.json`
+  );
   console.log(`"Logging (JSON Lines) to ${logPath}"`);
   const transports = [];
+
+  // Determine log level based on environment and debug mode
+  let transportLogLevel;
+  if (IS_PRODUCTION) {
+    transportLogLevel = config.DEBUG ? "silly" : "info";
+  } else {
+    transportLogLevel = "silly";
+  }
 
   transports.push(
     new winston.transports.File({
@@ -32,6 +44,7 @@ if (config.LOGGER_NEW) {
         winston.format.timestamp(),
         winston.format.json()
       ),
+      level: transportLogLevel,
       handleExceptions: true,
     })
   );
@@ -42,22 +55,24 @@ if (config.LOGGER_NEW) {
         sentry: {
           dsn: config.SENTRY_DSN,
         },
-        level: 'error', // just errors
-        exceptionLevels: ['error'],
+        level: "error", // just errors
+        exceptionLevels: ["error"],
       })
     );
   }
   if (config.LOGGER_PRETTY) {
     const { inspect } = require("util");
+
     transports.push(
       new winston.transports.Console({
+        level: transportLogLevel,
         format: winston.format.combine(
           winston.format.colorize({
             message: true,
             colors: {
               info: "blue",
             },
-            level: true
+            level: true,
           }),
           winston.format.timestamp(),
           winston.format.printf((info) => {
@@ -65,7 +80,9 @@ if (config.LOGGER_NEW) {
             if (typeof message === "object") {
               message = inspect(message, { depth: null, colors: true });
             }
-            return `[${info.timestamp}] ${info.level}: ${message}${info.stack ? "\n" + info.stack : ""}`;
+            return `[${info.timestamp}] ${info.level}: ${message}${
+              info.stack ? "\n" + info.stack : ""
+            }`;
           })
         ),
       })
@@ -73,6 +90,7 @@ if (config.LOGGER_NEW) {
   } else {
     transports.push(
       new winston.transports.Console({
+        level: transportLogLevel,
         format: winston.format.combine(
           winston.format.timestamp(),
           winston.format.json()
@@ -104,8 +122,8 @@ if (config.LOGGER_NEW) {
     // Ample amount of time for anything to do it's thing.
     await sleep(500);
     await flush();
-    globalThis._oldExit(...args)
-  }
+    globalThis._oldExit(...args);
+  };
 
   module.exports = logger;
 } else {

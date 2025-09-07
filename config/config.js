@@ -14,7 +14,7 @@ module.exports = {
     parseInt(process.env.DAILY_VERIFICATION_LIMIT) || 25,
   ADMIN_ROLE_ID: process.env.ADMIN_ROLE_ID,
   VERIFICATION_CHANNEL_ID: process.env.VERIFICATION_CHANNEL_ID,
-  DEBUG_MODE: BooleanLike(process.env.DEBUG_MODE),
+  DEBUG: BooleanLike(process.env.DEBUG_MODE ?? process.env.DEBUG),
   GUILD_ID: process.env.GUILD_ID,
   WEBHOOK_PORT: process.env.WEBHOOK_PORT || 3001,
   VERIFIED_ROLE_ID: process.env.VERIFIED_ROLE_ID,

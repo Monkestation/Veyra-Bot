@@ -6,6 +6,7 @@
  */
 
 require('dotenv').config();
+const { BooleanLike } = require('../utils/other');
 const { runInteractiveTest, testScenarios, simulateWebhookCall } = require('./testUtilities');
 
 async function main() {
@@ -62,7 +63,7 @@ main().then(() => {
   process.exit(0);
 }).catch(error => {
   console.error('\n❌ Test failed:', error.message);
-  if (process.env.DEBUG_MODE === 'true') {
+  if (BooleanLike(process.env.DEBUG_MODE ?? process.env.DEBUG)) {
     console.error(error.stack);
   }
   process.exit(1);

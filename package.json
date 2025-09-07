@@ -30,7 +30,7 @@
     "express": "^4.18.0",
     "uuid": "^9.0.0",
     "winston": "^3.17.0",
-    "winston-transport-sentry-node": "^3.0.0"
+    "winston-transport": "^4.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

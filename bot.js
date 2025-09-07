@@ -91,9 +91,7 @@ client.once('ready', async () => {
   try {
     await authenticateAPI();
   } catch {
-    console.error(
-      "Failed to authenticate with API. Bot will not function properly."
-    );
+    console.error("Failed to authenticate with API. Bot will not function properly.");
     process.exit(1);
   }
   

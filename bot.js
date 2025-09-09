@@ -6,6 +6,7 @@ const commands = require('./commands/commands');
 const { handleVerify, handleDebugVerify, handleCheckVerification } = require('./commands/commandHandlers');
 const { createWebhookServer } = require('./webhook/webhookServer');
 const { handleTestVerify, handleSimulateWebhook, handleListPending } = require('./commands/testCommandHandlers');
+const { PermissionsBitField } = require('discord.js');
 
 // Initialize persistent storage for pending verifications
 const pendingVerifications = new PersistentMap();
@@ -85,23 +86,69 @@ function startCleanupInterval() {
 // Discord bot ready event
 client.once('ready', async () => {
   console.log(`Bot logged in as ${client.user.tag}`);
-  
+
   // Authenticate with API
   try {
     await authenticateAPI();
   } catch {
-    console.error('Failed to authenticate with API. Bot will not function properly.');
+    console.error("Failed to authenticate with API. Bot will not function properly.");
     process.exit(1);
+  }
+  
+  try {
+    await client.guilds.fetch();
+  } catch (error) {
+    console.error("Failed to fetch guilds.", error);
+    return process.exit(1);
+  }
+
+  const primaryGuild = client.guilds.resolve(config.GUILD_ID);
+  
+  if (!primaryGuild) {
+    console.error("Bot is not in primary guild, exiitng...");
+    return process.exit(1);
   }
 
   // Register slash commands
   await registerCommands();
 
   // Set bot status
-  client.user.setActivity('iDenfy Verifications', { type: 'WATCHING' });
+  client.user.setActivity("iDenfy Verifications", { type: "WATCHING" });
 
   // Start cleanup interval
   startCleanupInterval();
+
+  if (!config.VERIFIED_ROLE_ID) {
+    console.warn("Proceeding without successful verification role");
+    return;
+  }
+
+  const verifiedRole = primaryGuild.roles.cache.find(
+    (r) => r.id === config.VERIFIED_ROLE_ID
+  );
+
+  const repetitiveRoleWarning = "Users will not be assigned role upon successful verification.";
+
+  if (!verifiedRole) {
+    console.warn(`Couldn't find verified role in primary guild. ${repetitiveRoleWarning}`);
+    return;
+  }
+
+  if (
+    !primaryGuild.members.me.permissions.has(
+      PermissionsBitField.Flags.ManageRoles
+    )
+  ) {
+    console.warn(`Bot does not have permission to manage roles! ${repetitiveRoleWarning}`);
+    return;
+  }
+
+  const botHighestRole = primaryGuild.guild.members.me.roles.highest;
+
+  if (botHighestRole.position <= verifiedRole.position) {
+    console.warn(`Bot's highest role is lower than verified role. ${repetitiveRoleWarning}`);
+    return;
+  };
 });
 
 // Error handling
@@ -143,8 +190,44 @@ process.on('SIGTERM', async () => {
   process.emit('SIGINT');
 });
 
+async function preflight() {
+  /**
+   * @type {(keyof import("./config/config"))[]}
+   */
+  const requiredKeys = [
+    "DISCORD_TOKEN",
+    "API_USERNAME",
+    "API_PASSWORD",
+    "IDENFY_API_KEY",
+    "IDENFY_API_SECRET",
+    "GUILD_ID",
+    "VERIFICATION_CHANNEL_ID",
+  ];
+
+  const missingKeys = requiredKeys.filter((key) => !config[key]);
+
+  const isDev =
+    process.env.NODE_ENV === "development" ||
+    config.DEBUG;
+
+  if (missingKeys.length > 0) {
+    if (isDev) {
+      console.warn(
+        `Warning: Missing required config keys: ${missingKeys.join(", ")}`
+      );
+    } else {
+      console.error(
+        `Missing required config keys: ${missingKeys.join(", ")}`
+      );
+      return 1;
+    }
+  }
+}
 // Start the bot
 async function start() {
+  if (preflight()) {
+    return process.exit(1);
+  }
   try {
     console.log('Starting bot...');
     

@@ -1,7 +1,18 @@
 const axios = require('axios');
 const config = require('../config/config');
+const jwtDecode = require('jwt-decode'); // npm install jwt-decode
 
 let jwtToken = null;
+
+function isJwtExpired(token) {
+  if (!token) return true;
+  try {
+    const { exp } = jwtDecode(token);
+    return Date.now() >= exp * 1000;
+  } catch {
+    return true;
+  }
+}
 
 // Axios instance for API calls
 const api = axios.create({
@@ -9,9 +20,12 @@ const api = axios.create({
   timeout: 10000
 });
 
-// Add JWT token to requests
+// Add JWT token to requests, refresh if expired
 api.interceptors.request.use(
-  config => {
+  async config => {
+    if (!jwtToken || isJwtExpired(jwtToken)) {
+      await authenticateAPI();
+    }
     if (jwtToken) {
       config.headers.Authorization = `Bearer ${jwtToken}`;
     }

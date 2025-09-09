@@ -10,7 +10,7 @@ const config = require('../config/config');
 async function createDummyVerification(discordId, ckey, dummyStatus = 'APPROVED') {
   try {
     const clientId = `test-discord-${discordId}`;
-    
+
     const requestBody = {
       clientId: clientId,
       externalRef: `test-ckey-${ckey}`,
@@ -100,7 +100,7 @@ async function simulateWebhookCall(scanRef, status = 'APPROVED', webhookUrl = `h
       mismatchTags: [],
       reasonCode: null,
       ...(status === 'DENIED' && { reasonCode: 'DOC_NOT_VALIDATED' }),
-      ...(status === 'SUSPECTED' && { 
+      ...(status === 'SUSPECTED' && {
         suspicionReasons: ['FACE_SUSPICIOUS'],
         fraudTags: ['FACE_PHOTO_OF_PHOTO']
       })
@@ -132,21 +132,21 @@ async function runCompleteTestFlow(discordId, ckey, finalStatus = 'APPROVED') {
     console.log(`Discord ID: ${discordId}`);
     console.log(`CKEY: ${ckey}`);
     console.log(`Final Status: ${finalStatus}`);
-    
+
     // Step 1: Create dummy verification
     console.log('\n1. Creating dummy verification...');
     const verification = await createDummyVerification(discordId, ckey, finalStatus);
     console.log('✅ Dummy verification created:', verification.scanRef);
-    
+
     // Step 2: Wait a moment to simulate processing time
     console.log('\n2. Waiting 3 seconds to simulate processing...');
     await new Promise(resolve => setTimeout(resolve, 3000));
-    
+
     // Step 3: Simulate webhook callback
     console.log('\n3. Simulating webhook callback...');
     await simulateWebhookCall(verification.scanRef, finalStatus);
     console.log('✅ Webhook simulation completed');
-    
+
     console.log('\n=== Test Flow Complete ===\n');
     return verification;
   } catch (error) {
@@ -174,7 +174,7 @@ async function runInteractiveTest() {
   console.log('4. Suspected verification');
   console.log('5. Custom webhook simulation only');
   console.log('6. Exit');
-  
+
   const readline = require('readline');
   const rl = readline.createInterface({
     input: process.stdin,
@@ -200,10 +200,11 @@ async function runInteractiveTest() {
           case '4':
             await testScenarios.suspected(testDiscordId, testCkey);
             break;
-          case '5':
+          case '5': {
             const scanRef = 'test-scan-ref-' + Date.now();
             await simulateWebhookCall(scanRef, 'APPROVED');
             break;
+          }
           case '6':
             console.log('Exiting...');
             break;

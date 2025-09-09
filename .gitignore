@@ -1,3 +1,4 @@
 /node_modules
 .env
 pending_verifications.json
+/logs

@@ -1,16 +1,17 @@
 {
-  "name": "discord-verification-bot",
+  "name": "veyra-bot",
   "version": "1.0.0",
   "description": "Discord bot for BYOND verification using iDenfy",
   "main": "bot.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js",
+    "start": "NODE_ENV=production node bot.js",
+    "dev": "NODE_ENV=development nodemon -i logs bot.js",
     "test": "jest",
     "test-idenfy": "node test/standaloneTest.js",
     "test-approved": "node test/standaloneTest.js approved",
     "test-denied": "node test/standaloneTest.js denied",
-    "test-webhook": "node test/standaloneTest.js webhook"
+    "test-webhook": "node test/standaloneTest.js webhook",
+    "lint": "eslint"
   },
   "keywords": [
     "discord",
@@ -22,12 +23,15 @@
   "author": "dwasint",
   "license": "MIT",
   "dependencies": {
+    "@sentry/node": "^10.10.0",
     "axios": "^1.0.0",
     "body-parser": "^1.20.0",
     "discord.js": "^14.0.0",
     "dotenv": "^16.0.0",
     "express": "^4.18.0",
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.0",
+    "winston": "^3.17.0",
+    "winston-transport": "^4.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",

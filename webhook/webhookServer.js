@@ -4,17 +4,19 @@ const { EmbedBuilder } = require('discord.js');
 const config = require('../config/config');
 const { submitVerification } = require('../services/apiClient');
 const { deleteIdenfyData } = require('../services/idenfyService');
+const logger = require('../utils/logger');
+const { setupExpressErrorHandler } = require('@sentry/node');
 
 // Helper function to retry deletion with initial delay and retries
 async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, baseDelay = 10000, initialDelay = 5000) {
   // Wait 5 seconds before first attempt to give iDenfy time to finish processing
-  console.log(`Waiting ${initialDelay/1000}s before attempting to delete iDenfy data for ${scanRef}...`);
+  logger.info(`Waiting ${initialDelay/1000}s before attempting to delete iDenfy data for ${scanRef}...`);
   await new Promise(resolve => setTimeout(resolve, initialDelay));
   
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       await deleteIdenfyData(scanRef);
-      console.log(`Successfully deleted iDenfy data for ${scanRef} on attempt ${attempt + 1}`);
+      logger.info(`Successfully deleted iDenfy data for ${scanRef} on attempt ${attempt + 1}`);
       
       // Notify user of successful deletion
       try {
@@ -31,7 +33,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
 
         await user.send({ embeds: [embed] });
       } catch (dmError) {
-        console.error(`Failed to send deletion success DM to user ${userId}:`, dmError.message);
+        logger.error(`Failed to send deletion success DM to user ${userId}:`, dmError.message);
       }
       
       return true;
@@ -40,7 +42,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
       
       if (!isProcessingError || attempt === maxRetries - 1) {
         // If it's not a processing error or we've exhausted retries, log and give up
-        console.error(`Failed to delete iDenfy data for ${scanRef} after ${attempt + 1} attempts:`, error.message);
+        logger.error(`Failed to delete iDenfy data for ${scanRef} after ${attempt + 1} attempts:`, error.message);
         
         // Notify user of deletion failure
         try {
@@ -58,7 +60,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
 
           await user.send({ embeds: [embed] });
         } catch (dmError) {
-          console.error(`Failed to send deletion failure DM to user ${userId}:`, dmError.message);
+          logger.error(`Failed to send deletion failure DM to user ${userId}:`, dmError.message);
         }
         
         return false;
@@ -66,7 +68,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
       
       // Wait before retrying (10s, 20s, 30s, etc.)
       const delay = baseDelay * (attempt + 1);
-      console.log(`Deletion failed for ${scanRef} (attempt ${attempt + 1}/${maxRetries}): ${error.message}. Retrying in ${delay/1000}s...`);
+      logger.info(`Deletion failed for ${scanRef} (attempt ${attempt + 1}/${maxRetries}): ${error.message}. Retrying in ${delay/1000}s...`);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
@@ -75,6 +77,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
 
 function createWebhookServer(client, pendingVerifications) {
   const webhookApp = express();
+  setupExpressErrorHandler(webhookApp);
   webhookApp.use(bodyParser.json());
 
   // Webhook endpoint for iDenfy callbacks
@@ -87,12 +90,12 @@ function createWebhookServer(client, pendingVerifications) {
       
       const pending = pendingVerifications.get(scanRef);
       if (!pending) {
-        console.log(`No pending verification found for scanRef: ${scanRef}`);
+        logger.info(`No pending verification found for scanRef: ${scanRef}`);
         return res.status(200).send('OK');
       }
 
-      console.log(`Received iDenfy webhook for ${scanRef}: ${overallStatus}`);
-      console.log('Full status object:', JSON.stringify(status, null, 2));
+      logger.info(`Received iDenfy webhook for ${scanRef}: ${overallStatus}`);
+      logger.info('Full status object:', JSON.stringify(status, null, 2));
 
       if (overallStatus === 'APPROVED') {
         // Verification successful
@@ -143,17 +146,16 @@ function createWebhookServer(client, pendingVerifications) {
                 { name: 'Scan Reference', value: scanRef, inline: true }
               )
               .setTimestamp();
-            
             // Start retry deletion in background with user notification - don't await it
             retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
-              console.error(`Background deletion retry failed for ${scanRef}:`, error);
+              logger.error(`Background deletion retry failed for ${scanRef}:`, error);
             });
             
             await channel.send({ embeds: [logEmbed] });
           }
 
         } catch (error) {
-          console.error('Failed to submit verification:', error);
+          logger.error('Failed to submit verification:', error);
           
           // Notify user of error
           const user = await client.users.fetch(pending.userId);
@@ -203,11 +205,11 @@ function createWebhookServer(client, pendingVerifications) {
         
         // Clean up iDenfy data with retry and user notification
         retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
-          console.error(`Background deletion retry failed for failed verification ${scanRef}:`, error);
+          logger.error(`Background deletion retry failed for failed verification ${scanRef}:`, error);
         });
       } else if (overallStatus === 'REVIEWING') {
         // Still under review - don't remove from pending
-        console.log(`Verification ${scanRef} is still under review`);
+        logger.info(`Verification ${scanRef} is still under review`);
         
         const user = await client.users.fetch(pending.userId);
         const embed = new EmbedBuilder()
@@ -223,19 +225,19 @@ function createWebhookServer(client, pendingVerifications) {
         await user.send({ embeds: [embed] });
       } else {
         // Handle other statuses (ACTIVE, DELETED, ARCHIVED)
-        console.log(`Received unexpected status for ${scanRef}: ${overallStatus}`);
+        logger.info(`Received unexpected status for ${scanRef}: ${overallStatus}`);
       }
 
       res.status(200).send('OK');
     } catch (error) {
-      console.error('iDenfy webhook error:', error);
+      logger.error('iDenfy webhook error:', error);
       res.status(500).send('Internal Server Error');
     }
   });
 
   // Start webhook server
   webhookApp.listen(config.WEBHOOK_PORT, () => {
-    console.log(`iDenfy webhook server listening on port ${config.WEBHOOK_PORT}`);
+    logger.info(`iDenfy webhook server listening on port ${config.WEBHOOK_PORT}`);
   });
 
   return webhookApp;

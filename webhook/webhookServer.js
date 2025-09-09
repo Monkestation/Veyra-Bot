@@ -6,7 +6,7 @@ const { submitVerification } = require('../services/apiClient');
 const { deleteIdenfyData } = require('../services/idenfyService');
 
 // Helper function to retry deletion with initial delay and retries
-async function retryDeleteIdenfyData(scanRef, maxRetries = 12, baseDelay = 10000, initialDelay = 5000) {
+async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, baseDelay = 10000, initialDelay = 5000) {
   // Wait 5 seconds before first attempt to give iDenfy time to finish processing
   console.log(`Waiting ${initialDelay/1000}s before attempting to delete iDenfy data for ${scanRef}...`);
   await new Promise(resolve => setTimeout(resolve, initialDelay));
@@ -15,6 +15,25 @@ async function retryDeleteIdenfyData(scanRef, maxRetries = 12, baseDelay = 10000
     try {
       await deleteIdenfyData(scanRef);
       console.log(`Successfully deleted iDenfy data for ${scanRef} on attempt ${attempt + 1}`);
+      
+      // Notify user of successful deletion
+      try {
+        const user = await client.users.fetch(userId);
+        const embed = new EmbedBuilder()
+          .setColor(0x00AA00)
+          .setTitle('Data Cleanup Complete')
+          .setDescription('Your verification data has been successfully removed from iDenfy\'s systems for privacy protection.')
+          .addFields(
+            { name: 'Scan Reference', value: scanRef, inline: true },
+            { name: 'Action', value: 'Data Deleted', inline: true }
+          )
+          .setTimestamp();
+
+        await user.send({ embeds: [embed] });
+      } catch (dmError) {
+        console.error(`Failed to send deletion success DM to user ${userId}:`, dmError.message);
+      }
+      
       return true;
     } catch (error) {
       const isProcessingError = error.message.includes('processing state');
@@ -22,6 +41,26 @@ async function retryDeleteIdenfyData(scanRef, maxRetries = 12, baseDelay = 10000
       if (!isProcessingError || attempt === maxRetries - 1) {
         // If it's not a processing error or we've exhausted retries, log and give up
         console.error(`Failed to delete iDenfy data for ${scanRef} after ${attempt + 1} attempts:`, error.message);
+        
+        // Notify user of deletion failure
+        try {
+          const user = await client.users.fetch(userId);
+          const embed = new EmbedBuilder()
+            .setColor(0xFF6B00)
+            .setTitle('Data Cleanup Warning')
+            .setDescription('We were unable to automatically delete your verification data from iDenfy\'s systems. This may be temporary - we will continue trying, or you can contact support if needed.')
+            .addFields(
+              { name: 'Scan Reference', value: scanRef, inline: true },
+              { name: 'Issue', value: 'Deletion Failed', inline: true },
+              { name: 'Next Steps', value: 'Our team has been notified and will handle this manually if needed.', inline: false }
+            )
+            .setTimestamp();
+
+          await user.send({ embeds: [embed] });
+        } catch (dmError) {
+          console.error(`Failed to send deletion failure DM to user ${userId}:`, dmError.message);
+        }
+        
         return false;
       }
       
@@ -105,8 +144,8 @@ function createWebhookServer(client, pendingVerifications) {
               )
               .setTimestamp();
             
-            // Start retry deletion in background - don't await it
-            retryDeleteIdenfyData(scanRef).catch(error => {
+            // Start retry deletion in background with user notification - don't await it
+            retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
               console.error(`Background deletion retry failed for ${scanRef}:`, error);
             });
             
@@ -162,8 +201,8 @@ function createWebhookServer(client, pendingVerifications) {
 
         await user.send({ embeds: [embed] });
         
-        // Clean up iDenfy data with retry
-        retryDeleteIdenfyData(scanRef).catch(error => {
+        // Clean up iDenfy data with retry and user notification
+        retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
           console.error(`Background deletion retry failed for failed verification ${scanRef}:`, error);
         });
       } else if (overallStatus === 'REVIEWING') {

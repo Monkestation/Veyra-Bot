@@ -4,8 +4,8 @@
   "description": "Discord bot for BYOND verification using iDenfy",
   "main": "bot.js",
   "scripts": {
-    "start": "NODE_ENV=production node bot.js",
-    "dev": "NODE_ENV=development nodemon -i logs bot.js",
+    "start": "cross-env NODE_ENV=production node bot.js",
+    "dev": "cross-env NODE_ENV=development nodemon -i logs bot.js",
     "test": "jest",
     "test-idenfy": "node test/standaloneTest.js",
     "test-approved": "node test/standaloneTest.js approved",
@@ -26,6 +26,7 @@
     "@sentry/node": "^10.10.0",
     "axios": "^1.0.0",
     "body-parser": "^1.20.0",
+    "cross-env": "^10.0.0",
     "discord.js": "^14.0.0",
     "dotenv": "^16.0.0",
     "express": "^4.18.0",

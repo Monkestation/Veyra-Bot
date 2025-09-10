@@ -14,7 +14,7 @@ async function safeSendDM(client, userId, content) {
     await user.send(content);
     return true;
   } catch (error) {
-    console.error(`Failed to send DM to user ${userId}:`, error.message);
+    logger.error(`Failed to send DM to user ${userId}:`, error.message);
     return false;
   }
 }
@@ -41,11 +41,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
         )
         .setTimestamp();
 
-        await user.send({ embeds: [embed] });
-      } catch (dmError) {
-        logger.error(`Failed to send deletion success DM to user ${userId}:`, dmError.message);
-      }
-      
+      safeSendDM(client, userId, { embeds: [embed] });
       return true;
     } catch (error) {
       const isProcessingError = error.message.includes('processing state');
@@ -66,11 +62,7 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
           )
           .setTimestamp();
 
-          await user.send({ embeds: [embed] });
-        } catch (dmError) {
-          logger.error(`Failed to send deletion failure DM to user ${userId}:`, dmError.message);
-        }
-        
+        safeSendDM(client, userId, { embeds: [embed] });
         return false;
       }
       
@@ -110,7 +102,7 @@ function createWebhookServer(client, pendingVerifications) {
         try {
           // Submit verification first (most critical operation)
           await submitVerification(pending.discordId, pending.ckey, false, scanRef);
-          console.log(`Successfully submitted verification for ${pending.ckey}`);
+          logger.info(`Successfully submitted verification for ${pending.ckey}`);
           
           // Remove from pending after successful submission
           pendingVerifications.delete(scanRef);
@@ -123,11 +115,11 @@ function createWebhookServer(client, pendingVerifications) {
               const verifiedRoleId = process.env.VERIFIED_ROLE_ID;
               if (verifiedRoleId && member && !member.roles.cache.has(verifiedRoleId)) {
                 await member.roles.add(verifiedRoleId, 'User verified with iDenfy');
-                console.log(`Assigned verified role to ${pending.username}`);
+                logger.info(`Assigned verified role to ${pending.username}`);
               }
             }
           } catch (roleError) {
-            console.error('Failed to assign verified role (continuing anyway):', roleError.message);
+            logger.error('Failed to assign verified role (continuing anyway):', roleError.message);
           }
       
           // Notify user (non-critical)
@@ -167,7 +159,7 @@ function createWebhookServer(client, pendingVerifications) {
           
           // Start retry deletion in background (non-blocking)
           retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
-            console.error(`Background deletion retry failed for ${scanRef}:`, error);
+            logger.error(`Background deletion retry failed for ${scanRef}:`, error);
           });
 
         } catch (error) {

@@ -10,11 +10,69 @@ const { setupExpressErrorHandler } = require('@sentry/node');
 // Helper function to safely send DM without throwing errors
 async function safeSendDM(client, userId, content) {
   try {
-    const user = await client.users.fetch(userId);
-    await user.send(content);
-    return true;
+    logger.info(`Attempting to send DM to user ${userId}`);
+    
+    // Check if client is ready
+    if (!client.isReady()) {
+      logger.error(`Discord client is not ready when trying to send DM to ${userId}`);
+      return false;
+    }
+
+    // Fetch user with more specific error handling
+    let user;
+    try {
+      user = await client.users.fetch(userId);
+      logger.info(`Successfully fetched user: ${user.tag} (${userId})`);
+    } catch (fetchError) {
+      logger.error(`Failed to fetch user ${userId}:`, {
+        error: fetchError.message,
+        code: fetchError.code,
+        status: fetchError.status
+      });
+      return false;
+    }
+
+    // Check if user allows DMs by attempting to create a DM channel first
+    try {
+      const dmChannel = await user.createDM();
+      logger.info(`DM channel created for user ${userId}: ${dmChannel.id}`);
+    } catch (dmError) {
+      logger.error(`Failed to create DM channel for user ${userId}:`, {
+        error: dmError.message,
+        code: dmError.code
+      });
+      return false;
+    }
+
+    // Send the actual message
+    try {
+      const message = await user.send(content);
+      logger.info(`Successfully sent DM to user ${userId}. Message ID: ${message.id}`);
+      return true;
+    } catch (sendError) {
+      logger.error(`Failed to send DM to user ${userId}:`, {
+        error: sendError.message,
+        code: sendError.code,
+        status: sendError.status,
+        requestData: sendError.requestData
+      });
+      
+      // Log specific error codes
+      if (sendError.code === 50007) {
+        logger.error(`User ${userId} has DMs disabled or blocked the bot`);
+      } else if (sendError.code === 10013) {
+        logger.error(`User ${userId} not found or invalid user ID`);
+      }
+      
+      return false;
+    }
+
   } catch (error) {
-    logger.error(`Failed to send DM to user ${userId}:`, error.message);
+    logger.error(`Unexpected error in safeSendDM for user ${userId}:`, {
+      error: error.message,
+      stack: error.stack,
+      code: error.code
+    });
     return false;
   }
 }
@@ -156,11 +214,6 @@ function createWebhookServer(client, pendingVerifications) {
             
             await channel.send({ embeds: [logEmbed] });
           }
-          
-          // Start retry deletion in background (non-blocking)
-          retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
-            logger.error(`Background deletion retry failed for ${scanRef}:`, error);
-          });
 
         } catch (error) {
           logger.error('Failed to submit verification:', error);

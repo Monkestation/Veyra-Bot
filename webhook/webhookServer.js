@@ -5,6 +5,18 @@ const config = require('../config/config');
 const { submitVerification } = require('../services/apiClient');
 const { deleteIdenfyData } = require('../services/idenfyService');
 
+// Helper function to safely send DM without throwing errors
+async function safeSendDM(client, userId, content) {
+  try {
+    const user = await client.users.fetch(userId);
+    await user.send(content);
+    return true;
+  } catch (error) {
+    console.error(`Failed to send DM to user ${userId}:`, error.message);
+    return false;
+  }
+}
+
 // Helper function to retry deletion with initial delay and retries
 async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, baseDelay = 10000, initialDelay = 5000) {
   // Wait 5 seconds before first attempt to give iDenfy time to finish processing
@@ -16,24 +28,18 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
       await deleteIdenfyData(scanRef);
       console.log(`Successfully deleted iDenfy data for ${scanRef} on attempt ${attempt + 1}`);
       
-      // Notify user of successful deletion
-      try {
-        const user = await client.users.fetch(userId);
-        const embed = new EmbedBuilder()
-          .setColor(0x00AA00)
-          .setTitle('Data Cleanup Complete')
-          .setDescription('Your verification data has been successfully removed from iDenfy\'s systems for privacy protection.')
-          .addFields(
-            { name: 'Scan Reference', value: scanRef, inline: true },
-            { name: 'Action', value: 'Data Deleted', inline: true }
-          )
-          .setTimestamp();
+      // Notify user of successful deletion (non-blocking)
+      const embed = new EmbedBuilder()
+        .setColor(0x00AA00)
+        .setTitle('Data Cleanup Complete')
+        .setDescription('Your verification data has been successfully removed from iDenfy\'s systems for privacy protection.')
+        .addFields(
+          { name: 'Scan Reference', value: scanRef, inline: true },
+          { name: 'Action', value: 'Data Deleted', inline: true }
+        )
+        .setTimestamp();
 
-        await user.send({ embeds: [embed] });
-      } catch (dmError) {
-        console.error(`Failed to send deletion success DM to user ${userId}:`, dmError.message);
-      }
-      
+      safeSendDM(client, userId, { embeds: [embed] });
       return true;
     } catch (error) {
       const isProcessingError = error.message.includes('processing state');
@@ -42,25 +48,19 @@ async function retryDeleteIdenfyData(client, scanRef, userId, maxRetries = 12, b
         // If it's not a processing error or we've exhausted retries, log and give up
         console.error(`Failed to delete iDenfy data for ${scanRef} after ${attempt + 1} attempts:`, error.message);
         
-        // Notify user of deletion failure
-        try {
-          const user = await client.users.fetch(userId);
-          const embed = new EmbedBuilder()
-            .setColor(0xFF6B00)
-            .setTitle('Data Cleanup Warning')
-            .setDescription('We were unable to automatically delete your verification data from iDenfy\'s systems. This may be temporary - we will continue trying, or you can contact support if needed.')
-            .addFields(
-              { name: 'Scan Reference', value: scanRef, inline: true },
-              { name: 'Issue', value: 'Deletion Failed', inline: true },
-              { name: 'Next Steps', value: 'Our team has been notified and will handle this manually if needed.', inline: false }
-            )
-            .setTimestamp();
+        // Notify user of deletion failure (non-blocking)
+        const embed = new EmbedBuilder()
+          .setColor(0xFF6B00)
+          .setTitle('Data Cleanup Warning')
+          .setDescription('We were unable to automatically delete your verification data from iDenfy\'s systems. This may be temporary - we will continue trying, or you can contact support if needed.')
+          .addFields(
+            { name: 'Scan Reference', value: scanRef, inline: true },
+            { name: 'Issue', value: 'Deletion Failed', inline: true },
+            { name: 'Next Steps', value: 'Our team has been notified and will handle this manually if needed.', inline: false }
+          )
+          .setTimestamp();
 
-          await user.send({ embeds: [embed] });
-        } catch (dmError) {
-          console.error(`Failed to send deletion failure DM to user ${userId}:`, dmError.message);
-        }
-        
+        safeSendDM(client, userId, { embeds: [embed] });
         return false;
       }
       
@@ -97,11 +97,14 @@ function createWebhookServer(client, pendingVerifications) {
       if (overallStatus === 'APPROVED') {
         // Verification successful
         try {
+          // Submit verification first (most critical operation)
           await submitVerification(pending.discordId, pending.ckey, false, scanRef);
+          console.log(`Successfully submitted verification for ${pending.ckey}`);
           
           // Remove from pending after successful submission
           pendingVerifications.delete(scanRef);
           
+          // Try to assign role (non-critical)
           try {
             const guild = client.guilds.cache.get(config.GUILD_ID);
             if (guild) {
@@ -109,14 +112,14 @@ function createWebhookServer(client, pendingVerifications) {
               const verifiedRoleId = process.env.VERIFIED_ROLE_ID;
               if (verifiedRoleId && member && !member.roles.cache.has(verifiedRoleId)) {
                 await member.roles.add(verifiedRoleId, 'User verified with iDenfy');
+                console.log(`Assigned verified role to ${pending.username}`);
               }
             }
           } catch (roleError) {
-            console.error('Failed to assign verified role:', roleError);
+            console.error('Failed to assign verified role (continuing anyway):', roleError.message);
           }
       
-          // Notify user
-          const user = await client.users.fetch(pending.userId);
+          // Notify user (non-critical)
           const embed = new EmbedBuilder()
             .setColor(0x00FF00)
             .setTitle('Verification Successful!')
@@ -128,54 +131,53 @@ function createWebhookServer(client, pendingVerifications) {
             )
             .setTimestamp();
 
-          await user.send({ embeds: [embed] });
+          safeSendDM(client, pending.userId, { embeds: [embed] });
           
-          // Log to verification channel
-          if (config.VERIFICATION_CHANNEL_ID) {
-            const channel = await client.channels.fetch(config.VERIFICATION_CHANNEL_ID);
-            const logEmbed = new EmbedBuilder()
-              .setColor(0x00FF00)
-              .setTitle('New Verification')
-              .addFields(
-                { name: 'Discord User', value: `<@${pending.discordId}> (${pending.username})`, inline: true },
-                { name: 'CKEY', value: pending.ckey, inline: true },
-                { name: 'Method', value: 'iDenfy', inline: true },
-                { name: 'Scan Reference', value: scanRef, inline: true }
-              )
-              .setTimestamp();
-            
-            // Start retry deletion in background with user notification - don't await it
-            retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
-              console.error(`Background deletion retry failed for ${scanRef}:`, error);
-            });
-            
-            await channel.send({ embeds: [logEmbed] });
+          // Log to verification channel (non-critical)
+          try {
+            if (config.VERIFICATION_CHANNEL_ID) {
+              const channel = await client.channels.fetch(config.VERIFICATION_CHANNEL_ID);
+              const logEmbed = new EmbedBuilder()
+                .setColor(0x00FF00)
+                .setTitle('New Verification')
+                .addFields(
+                  { name: 'Discord User', value: `<@${pending.discordId}> (${pending.username})`, inline: true },
+                  { name: 'CKEY', value: pending.ckey, inline: true },
+                  { name: 'Method', value: 'iDenfy', inline: true },
+                  { name: 'Scan Reference', value: scanRef, inline: true }
+                )
+                .setTimestamp();
+              
+              await channel.send({ embeds: [logEmbed] });
+            }
+          } catch (channelError) {
+            console.error('Failed to log to verification channel (continuing anyway):', channelError.message);
           }
+          
+          // Start retry deletion in background (non-blocking)
+          retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
+            console.error(`Background deletion retry failed for ${scanRef}:`, error);
+          });
 
         } catch (error) {
           console.error('Failed to submit verification:', error);
           
-          // Notify user of error
-          const user = await client.users.fetch(pending.userId);
-          await user.send({
-            content: 'Your identity was verified, but there was an error saving it. Please contact an administrator.',
-            embeds: [
-              new EmbedBuilder()
-                .setColor(0xFF6B6B)
-                .setTitle('Verification Error')
-                .addFields(
-                  { name: 'Scan Reference', value: scanRef, inline: true },
-                  { name: 'CKEY', value: pending.ckey, inline: true }
-                )
-                .setTimestamp()
-            ]
-          });
+          // Even if verification submission failed, still try to notify user
+          const errorEmbed = new EmbedBuilder()
+            .setColor(0xFF6B6B)
+            .setTitle('Verification Error')
+            .setDescription('Your identity was verified, but there was an error saving it. Please contact an administrator.')
+            .addFields(
+              { name: 'Scan Reference', value: scanRef, inline: true },
+              { name: 'CKEY', value: pending.ckey, inline: true }
+            )
+            .setTimestamp();
+
+          safeSendDM(client, pending.userId, { embeds: [errorEmbed] });
         }
       } else if (overallStatus === 'DENIED' || overallStatus === 'EXPIRED' || overallStatus === 'SUSPECTED') {
         // Verification failed - remove from pending
         pendingVerifications.delete(scanRef);
-        
-        const user = await client.users.fetch(pending.userId);
         
         // Provide more detailed failure information
         let failureReason = 'Unknown reason';
@@ -199,9 +201,10 @@ function createWebhookServer(client, pendingVerifications) {
           )
           .setTimestamp();
 
-        await user.send({ embeds: [embed] });
+        // Send failure notification (non-blocking)
+        safeSendDM(client, pending.userId, { embeds: [embed] });
         
-        // Clean up iDenfy data with retry and user notification
+        // Clean up iDenfy data with retry (non-blocking)
         retryDeleteIdenfyData(client, scanRef, pending.userId).catch(error => {
           console.error(`Background deletion retry failed for failed verification ${scanRef}:`, error);
         });
@@ -209,7 +212,6 @@ function createWebhookServer(client, pendingVerifications) {
         // Still under review - don't remove from pending
         console.log(`Verification ${scanRef} is still under review`);
         
-        const user = await client.users.fetch(pending.userId);
         const embed = new EmbedBuilder()
           .setColor(0xFFFF00)
           .setTitle('Verification Under Review')
@@ -220,12 +222,14 @@ function createWebhookServer(client, pendingVerifications) {
           )
           .setTimestamp();
 
-        await user.send({ embeds: [embed] });
+        // Send review notification (non-blocking)
+        safeSendDM(client, pending.userId, { embeds: [embed] });
       } else {
         // Handle other statuses (ACTIVE, DELETED, ARCHIVED)
         console.log(`Received unexpected status for ${scanRef}: ${overallStatus}`);
       }
 
+      // Always return success to iDenfy
       res.status(200).send('OK');
     } catch (error) {
       console.error('iDenfy webhook error:', error);

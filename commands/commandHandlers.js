@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const config = require('../config/config');
 const { checkDailyLimit, submitVerification, getExistingVerification } = require('../services/apiClient');
 const { createIdenfyVerification, getIdenfyVerificationStatus, deleteIdenfyData } = require('../services/idenfyService');
+const logger = require('../utils/logger');
 
 /**
  * Handle /verify command
@@ -37,7 +38,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
     // If they have vetted flag but no scan_ref, they can proceed with ID verification
     
   } catch (error) {
-    console.error('Error checking verification status:', error);
+    logger.error('Error checking verification status:', error);
     return await interaction.editReply({
       content: 'Unable to verify your status. Please try again later.',
       ephemeral: true
@@ -126,6 +127,7 @@ async function handleVerify(interaction, pendingVerifications, client) {
       ephemeral: true
     });
   } catch (error) {
+    logger.error(`Failed to create verification session`, error);
     await interaction.editReply({
       content: 'Failed to create verification session. Please try again later.',
       ephemeral: true
@@ -196,9 +198,9 @@ async function handleManualApproval(verificationId, pendingVerifications, client
         embeds: [embed]
       });
 
-      console.log(`Successfully sent iDenfy link to user ${pendingVerification.username} (${pendingVerification.discordId})`);
+      logger.info(`Successfully sent iDenfy link to user ${pendingVerification.username} (${pendingVerification.discordId})`);
     } catch (dmError) {
-      console.error('Failed to DM user with iDenfy link:', dmError);
+      logger.error('Failed to DM user with iDenfy link:', dmError);
       
       // Try to post in verification channel as fallback
       try {
@@ -220,7 +222,7 @@ async function handleManualApproval(verificationId, pendingVerifications, client
           embeds: [fallbackEmbed]
         });
       } catch (channelError) {
-        console.error('Failed to post fallback message in verification channel:', channelError);
+        logger.error('Failed to post fallback message in verification channel:', channelError);
       }
     }
 
@@ -231,7 +233,7 @@ async function handleManualApproval(verificationId, pendingVerifications, client
       userNotified: true // We attempted to notify (success handled above)
     };
   } catch (error) {
-    console.error('Failed to create iDenfy verification after approval:', error);
+    logger.error('Failed to create iDenfy verification after approval:', error);
     throw error;
   }
 }
@@ -326,7 +328,7 @@ async function handleCheckVerification(interaction, pendingVerifications) {
         }
       } catch (error) {
         // Error checking existing verification
-        console.error('Error checking existing verification:', error);
+        logger.error('Error checking existing verification:', error);
       }
 
       return interaction.editReply({

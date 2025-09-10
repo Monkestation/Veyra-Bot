@@ -6,12 +6,12 @@ A Discord bot that provides secure identity verification for Veyra. This system 
 
 ### Standard Verification Process
 
-1. **User Initiation**: User runs `/verify <ckey>` command in Discord
+1. **[User Initiation](https://github.com/Monkestation/Veyra-Bot/blob/main/commands/commandHandlers.js#L15)**: User runs `/verify <ckey>` command in Discord
 2. **Limit Check**: System checks if daily verification limit has been reached
-3. **Session Creation**: If under limit, creates iDenfy verification session
+3. **[Session Creation](https://github.com/Monkestation/Veyra-Bot/blob/main/commands/commandHandlers.js#L15)**: If under limit, creates iDenfy verification session
 4. **Identity Verification**: User completes document scan and facial recognition via iDenfy
-5. **Webhook Processing**: iDenfy sends verification result to webhook endpoint which is also hosted on this bot
-7. **User Notification**: User receives confirmation via Discord response.
+5. **[Webhook Processing](https://github.com/Monkestation/Veyra-Bot/blob/main/webhook/webhookServer.js#L142)**: iDenfy sends verification result to webhook endpoint which is also hosted on this bot
+7. **[User Notification](https://github.com/Monkestation/Veyra-Bot/blob/main/webhook/webhookServer.js#L11)**: User receives confirmation via Discord response.
 8. **[Data Deletion](https://github.com/Monkestation/Veyra-Bot/blob/main/webhook/webhookServer.js#L81)**: Data is deleted from iDenfy's system leaving only a scanRef which we can use as proof of identification in the future.
 
 ### Verification Statuses from iDenfy

@@ -258,7 +258,7 @@ async function handleDebugVerify(interaction) {
   const discordId = interaction.user.id;
 
   try {
-    const result = await submitVerification(discordId, ckey, true);
+    await submitVerification(discordId, ckey, true);
     
     const embed = new EmbedBuilder()
       .setColor(0xFFFF00)
@@ -359,7 +359,7 @@ async function handleCheckVerification(interaction, pendingVerifications) {
     // Legacy manual approval flow (immediate submission)
     if (pending.type === 'manual_approval') {
       try {
-        const result = await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
+        await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
 
         // Remove from pending after submit
         pendingVerifications.delete(actualScanRef);
@@ -440,7 +440,7 @@ async function handleCheckVerification(interaction, pendingVerifications) {
     // If approved, submit and delete iDenfy data
     if (status?.status === 'APPROVED') {
       try {
-        const result = await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
+        await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
 
         pendingVerifications.delete(actualScanRef);
 

@@ -141,7 +141,7 @@ function createWebhookServer(client, pendingVerifications) {
   // Webhook endpoint for iDenfy callbacks
   webhookApp.post('/webhook/idenfy', async (req, res) => {
     try {
-      const { scanRef, status, platform } = req.body;
+      const { scanRef, status } = req.body;
       
       // Extract the actual status from the status object
       const overallStatus = status?.overall;

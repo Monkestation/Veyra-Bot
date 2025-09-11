@@ -4,9 +4,11 @@ const config = require('./config/config');
 const { PersistentMap } = require('./utils/PersistentMap');
 const { authenticateAPI } = require('./services/apiClient');
 const commands = require('./commands/commands');
-const { handleVerify, handleDebugVerify, handleCheckVerification } = require('./commands/commandHandlers');
+const { handleVerify, handleDebugVerify, handleCheckVerification, handleForcePrune } = require('./commands/commandHandlers');
 const { createWebhookServer } = require('./webhook/webhookServer');
 const { handleTestVerify, handleSimulateWebhook, handleListPending } = require('./commands/testCommandHandlers');
+const path = require('node:path');
+const Pruner = require('./pruner');
 
 // Initialize persistent storage for pending verifications
 const pendingVerifications = new PersistentMap();
@@ -19,6 +21,12 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers
   ]
+});
+
+const pruner = new Pruner(client, {
+  daysBetweenPrunes: config.PRUNE_DAYS_BETWEEN || 7,
+  excludeRecentJoinHours: config.PRUNE_EXCLUDE_JOINED_HOURS || 24,
+  lastPruneFile: path.join(__dirname, "data", 'lastPrune.json'),
 });
 
 // Register slash commands
@@ -57,6 +65,9 @@ client.on('interactionCreate', async interaction => {
       case 'list-pending':
         await handleListPending(interaction, pendingVerifications);
         break;
+      case 'force-prune':
+        await handleForcePrune(interaction, pruner);
+        break;
     }
   } catch (error) {
     logger.error(`Error handling command ${commandName}:`, error);
@@ -83,11 +94,9 @@ function startCleanupInterval() {
   }, CLEANUP_INTERVAL);
 }
 
-// Discord bot ready event
-client.once('ready', async () => {
+client.once('clientReady', async () => {
   logger.info(`Bot logged in as ${client.user.tag}`);
   
-  // Authenticate with API
   try {
     await authenticateAPI();
   } catch {
@@ -95,14 +104,14 @@ client.once('ready', async () => {
     return process.exit(1);
   }
 
-  // Register slash commands
   await registerCommands();
 
-  // Set bot status
   client.user.setActivity('iDenfy Verifications', { type: 'WATCHING' });
 
-  // Start cleanup interval
   startCleanupInterval();
+
+  await pruner.maybePruneOnStartup();
+  pruner.startPruneInterval();
 });
 
 // Error handling
@@ -118,12 +127,27 @@ process.on('unhandledRejection', error => {
 process.on('SIGINT', async () => {
   logger.info('Shutting down gracefully...');
   
+  if (pruner.pruneIntervalVal != undefined) {
+    clearInterval(pruner.pruneIntervalVal);
+  }
+
   try {
     // Force a final save of pending verifications
     await pendingVerifications.forceSave();
     logger.info('Final save of pending verifications completed');
   } catch (error) {
     logger.error('Failed to save pending verifications during shutdown:', error);
+  }
+  
+  // striaght up pruning it, and by it, haha, lets just say,
+  if (pruner.pruning) {
+    logger.warn('Pruning in progress. Waiting for it to complete...');
+
+    while (pruner.pruning) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    logger.info('Pruning complete.');
   }
 
   // Close Discord client

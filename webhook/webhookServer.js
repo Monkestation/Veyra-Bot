@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, RESTJSONErrorCodes } = require('discord.js');
 const config = require('../config/config');
 const { submitVerification } = require('../services/apiClient');
 const { deleteIdenfyData } = require('../services/idenfyService');
@@ -58,9 +58,9 @@ async function safeSendDM(client, userId, content) {
       });
       
       // Log specific error codes
-      if (sendError.code === 50007) {
+      if (sendError.code === RESTJSONErrorCodes.CannotSendMessagesToThisUser) {
         logger.error(`User ${userId} has DMs disabled or blocked the bot`);
-      } else if (sendError.code === 10013) {
+      } else if (sendError.code === RESTJSONErrorCodes.UnknownUser) {
         logger.error(`User ${userId} not found or invalid user ID`);
       }
       

@@ -507,9 +507,44 @@ async function handleCheckVerification(interaction, pendingVerifications) {
   }
 }
 
+/**
+ * Handle /force-prune command
+ * @param {import("discord.js").ChatInputCommandInteraction} interaction 
+ * @param {import("../pruner.js")} pruner
+ */
+async function handleForcePrune(interaction, pruner) {
+  await interaction.deferReply({ ephemeral: true });
+  
+  try {
+    const guild = interaction.guild;
+
+    if (!guild) {
+      await interaction.editReply("❌ This command must be run in a server.");
+      return;
+    }
+    
+    if (!interaction.member.roles.cache.has(config.ADMIN_ROLE_ID)) {
+      await interaction.editReply("❌ You do not have the permissions to do this!");
+      return;
+    }
+
+    if (pruner.pruning) {
+      await interaction.editReply("⚠️ A prune operation is already in progress.");
+      return;
+    }
+
+    await pruner.pruneMembers(guild);
+    await interaction.editReply("✅Force prune completed. Check logs for detailed report.");
+  } catch (err) {
+    console.error("Error in /force-prune:", err);
+    await interaction.editReply("❌ An error occurred while trying to prune members.");
+  }
+}
+
 module.exports = {
   handleVerify,
   handleDebugVerify,
   handleCheckVerification,
-  handleManualApproval
+  handleManualApproval,
+  handleForcePrune
 };

@@ -27,7 +27,10 @@ async function registerCommands() {
     await client.application.commands.set(commands, config.GUILD_ID);
     logger.info('Slash commands registered successfully');
   } catch (error) {
-    logger.error('Failed to register slash commands:', error);
+    logger.error({
+      message: 'Failed to register slash commands:',
+      error,
+    });
   }
 }
 
@@ -59,7 +62,18 @@ client.on('interactionCreate', async interaction => {
         break;
     }
   } catch (error) {
-    logger.error(`Error handling command ${commandName}:`, error);
+    logger.error({
+      message: `Error handling command`,
+      error,
+      context: {
+        userId,
+        username: interaction.user.username,
+        channelId: interaction.channelId,
+      },
+      tags: {
+        command: commandName
+      }
+    });
     
     const reply = {
       content: 'An error occurred while processing your request.',
@@ -90,8 +104,11 @@ client.once('ready', async () => {
   // Authenticate with API
   try {
     await authenticateAPI();
-  } catch {
-    logger.error('Failed to authenticate with API. Bot will not function properly.');
+  } catch (error) {
+    logger.error({
+      message: 'Failed to authenticate with API. Bot will not function properly.',
+      error,
+    });
     return process.exit(1);
   }
 
@@ -105,13 +122,20 @@ client.once('ready', async () => {
   startCleanupInterval();
 });
 
+
 // Error handling
 client.on('error', error => {
-  logger.error('Discord client error:', error);
+  logger.error({
+    message: 'Discord client error',
+    error,
+  });
 });
 
 process.on('unhandledRejection', error => {
-  logger.error('Unhandled promise rejection:', error);
+  logger.error({
+    message: "Unhandled promise rejection",
+    error
+  });
 });
 
 // Enhanced graceful shutdown with better error handling
@@ -123,7 +147,10 @@ process.on('SIGINT', async () => {
     await pendingVerifications.forceSave();
     logger.info('Final save of pending verifications completed');
   } catch (error) {
-    logger.error('Failed to save pending verifications during shutdown:', error);
+    logger.error({
+      message: 'Failed to save pending verifications during shutdown',
+      error
+    });
   }
 
   // Close Discord client
@@ -131,7 +158,10 @@ process.on('SIGINT', async () => {
     client.destroy();
     logger.info('Discord client closed');
   } catch (error) {
-    logger.error('Error closing Discord client:', error);
+    logger.error({
+      message: "Error closing Discord client",
+      error
+    });
   }
 
   logger.info('Shutdown complete');
@@ -163,7 +193,10 @@ async function start() {
     
     logger.info('Bot startup complete!');
   } catch (error) {
-    logger.error('Failed to start bot:', error);
+    logger.error({
+      message: 'Failed to start bot', 
+      error
+    });
     process.exit(1);
   }
 }

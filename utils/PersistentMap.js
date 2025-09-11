@@ -27,7 +27,10 @@ async function savePendingVerifications(dataMap) {
     
     logger.debug(`Saved ${dataMap.size} pending verifications to disk`);
   } catch (error) {
-    logger.error('Failed to save pending verifications:', error.message);
+    logger.error({
+      message: 'Failed to save pending verifications',
+      error,
+    });
     
     // Try to clean up temp file if it exists
     try {
@@ -116,7 +119,10 @@ class PersistentMap extends Map {
       try {
         pendingObject = JSON.parse(data);
       } catch (parseError) {
-        logger.error('Failed to parse pending verifications JSON:', parseError.message);
+        logger.error({
+          message: "Failed to parse pending verifications JSON",
+          error: parseError
+        });
         logger.info('Creating backup of corrupted file and starting fresh');
         
         // Create backup of corrupted file
@@ -184,7 +190,10 @@ class PersistentMap extends Map {
         await savePendingVerifications(this);
       }
     } catch (error) {
-      logger.error('Error loading pending verifications:', error.message);
+      logger.error({
+        message: 'Error loading pending verifications',
+        error,
+      });
       logger.info('Starting with empty pending verifications');
       
       this.clear();

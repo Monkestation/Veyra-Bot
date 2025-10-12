@@ -18,7 +18,8 @@ module.exports = {
   GUILD_ID: process.env.GUILD_ID,
   WEBHOOK_PORT: process.env.WEBHOOK_PORT || 3001,
   VERIFIED_ROLE_ID: process.env.VERIFIED_ROLE_ID,
+  PRUNE_DAYS_BETWEEN: process.env.PRUNE_DAYS_BETWEEN,
+  PRUNE_EXCLUDE_JOINED_HOURS: process.env.PRUNE_EXCLUDE_JOINED_HOURS,
   SENTRY_DSN: process.env.SENTRY_DSN,
-  LOGGER_NEW: BooleanLike(process.env.LOGGER_NEW),
   LOGGER_PRETTY: BooleanLike(process.env.LOGGER_PRETTY),
 };

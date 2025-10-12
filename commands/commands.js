@@ -19,7 +19,10 @@ const commands = [
     ),
   new SlashCommandBuilder()
     .setName('check-verification')
-    .setDescription('Check your verification status')
+    .setDescription('Check your verification status'),
+  new SlashCommandBuilder()
+    .setName('force-prune')
+    .setDescription('Force prune members')
 ];
 
 module.exports = commands;

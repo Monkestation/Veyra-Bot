@@ -14,8 +14,11 @@ export default defineConfig([
   {
     files: ["**/*.{js,mjs,cjs}"],
     plugins: { js },
-    rules: js.configs.recommended.rules,
+    rules: {
+      "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }]
+    },
     languageOptions: { globals: globals.node },
+    extends: ["js/recommended"],
   },
   {
     files: ["**/*.js"],

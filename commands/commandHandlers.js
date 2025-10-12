@@ -258,7 +258,7 @@ async function handleDebugVerify(interaction) {
   const discordId = interaction.user.id;
 
   try {
-    const result = await submitVerification(discordId, ckey, true);
+    await submitVerification(discordId, ckey, true);
     
     const embed = new EmbedBuilder()
       .setColor(0xFFFF00)
@@ -359,7 +359,7 @@ async function handleCheckVerification(interaction, pendingVerifications) {
     // Legacy manual approval flow (immediate submission)
     if (pending.type === 'manual_approval') {
       try {
-        const result = await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
+        await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
 
         // Remove from pending after submit
         pendingVerifications.delete(actualScanRef);
@@ -440,7 +440,7 @@ async function handleCheckVerification(interaction, pendingVerifications) {
     // If approved, submit and delete iDenfy data
     if (status?.status === 'APPROVED') {
       try {
-        const result = await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
+        await submitVerification(pending.discordId, pending.ckey, false, actualScanRef);
 
         pendingVerifications.delete(actualScanRef);
 
@@ -507,9 +507,44 @@ async function handleCheckVerification(interaction, pendingVerifications) {
   }
 }
 
+/**
+ * Handle /force-prune command
+ * @param {import("discord.js").ChatInputCommandInteraction} interaction 
+ * @param {import("../pruner.js")} pruner
+ */
+async function handleForcePrune(interaction, pruner) {
+  await interaction.deferReply({ ephemeral: true });
+  
+  try {
+    const guild = interaction.guild;
+
+    if (!guild) {
+      await interaction.editReply("❌ This command must be run in a server.");
+      return;
+    }
+    
+    if (!interaction.member.roles.cache.has(config.ADMIN_ROLE_ID)) {
+      await interaction.editReply("❌ You do not have the permissions to do this!");
+      return;
+    }
+
+    if (pruner.pruning) {
+      await interaction.editReply("⚠️ A prune operation is already in progress.");
+      return;
+    }
+
+    await pruner.pruneMembers(guild);
+    await interaction.editReply("✅Force prune completed. Check logs for detailed report.");
+  } catch (err) {
+    console.error("Error in /force-prune:", err);
+    await interaction.editReply("❌ An error occurred while trying to prune members.");
+  }
+}
+
 module.exports = {
   handleVerify,
   handleDebugVerify,
   handleCheckVerification,
-  handleManualApproval
+  handleManualApproval,
+  handleForcePrune
 };

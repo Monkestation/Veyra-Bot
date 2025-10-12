@@ -18,10 +18,11 @@ async function handleVerify(interaction, pendingVerifications, client) {
   const ckey = interaction.options.getString('ckey');
   const discordId = interaction.user.id;
 
+  let existingVerification;
   // Check if user is vetted and verification status
   try {
-    const existing = await getExistingVerification(discordId);
-    if (!existing || !existing.verified_flags || !existing.verified_flags.vetted) {
+    existingVerification = await getExistingVerification(discordId);
+    if (!existingVerification || !existingVerification.verified_flags || !existingVerification.verified_flags.vetted) {
       return await interaction.editReply({
         content: 'Access denied. You must be vetted to use the verification system.',
         ephemeral: true
@@ -29,16 +30,24 @@ async function handleVerify(interaction, pendingVerifications, client) {
     }
     
     // Check if they already have scan_ref (already ID verified)
-    if (existing.verified_flags.scan_ref) {
+    if (existingVerification.verified_flags.scan_ref) {
       return await interaction.editReply({
-        content: `You are already ID verified with ckey: ${existing.ckey}`,
+        content: `You are already ID verified with ckey: ${existingVerification.ckey}`,
         ephemeral: true
       });
     }
     // If they have vetted flag but no scan_ref, they can proceed with ID verification
     
   } catch (error) {
-    logger.error('Error checking verification status:', error);
+    logger.error({
+      message: 'Error checking verification status',
+      error,
+      context: {
+        discordId: discordId,
+        ckey,
+        existingVerification
+      }
+    });
     return await interaction.editReply({
       content: 'Unable to verify your status. Please try again later.',
       ephemeral: true
@@ -127,7 +136,15 @@ async function handleVerify(interaction, pendingVerifications, client) {
       ephemeral: true
     });
   } catch (error) {
-    logger.error(`Failed to create verification session`, error);
+    logger.error({
+      message: `Failed to create verification session`,
+      error,
+      context: {
+        discordId,
+        ckey,
+        existingVerification: existingVerification,
+      }
+    });
     await interaction.editReply({
       content: 'Failed to create verification session. Please try again later.',
       ephemeral: true
@@ -200,7 +217,17 @@ async function handleManualApproval(verificationId, pendingVerifications, client
 
       logger.info(`Successfully sent iDenfy link to user ${pendingVerification.username} (${pendingVerification.discordId})`);
     } catch (dmError) {
-      logger.error('Failed to DM user with iDenfy link:', dmError);
+      logger.error({
+        message: 'Failed to DM user with iDenfy link',
+        error: dmError,
+        context: {
+          discordId: pendingVerification.discordId,
+          verificationId,
+          pendingVerification,
+          verification,
+          adminUser
+        }
+      });
       
       // Try to post in verification channel as fallback
       try {
@@ -222,7 +249,17 @@ async function handleManualApproval(verificationId, pendingVerifications, client
           embeds: [fallbackEmbed]
         });
       } catch (channelError) {
-        logger.error('Failed to post fallback message in verification channel:', channelError);
+        logger.error({
+          message: 'Failed to post fallback message in verification channel',
+          error: channelError,
+          context: {
+            discordId: pendingVerification.discordId,
+            verificationId,
+            pendingVerification,
+            verification,
+            adminUser
+          }
+        });
       }
     }
 
@@ -233,7 +270,16 @@ async function handleManualApproval(verificationId, pendingVerifications, client
       userNotified: true // We attempted to notify (success handled above)
     };
   } catch (error) {
-    logger.error('Failed to create iDenfy verification after approval:', error);
+    logger.error({
+      message: "Failed to create iDenfy verification after approval",
+      error,
+      context: {
+        discordId: pendingVerification.discordId,
+        verificationId,
+        pendingVerification,
+        adminUser
+      }
+    });
     throw error;
   }
 }
@@ -276,6 +322,13 @@ async function handleDebugVerify(interaction) {
       ephemeral: true
     });
   } catch (error) {
+    logger.error({
+      message: "Failed to create debug verification",
+      error,
+      context: {
+        debug: true,
+      }
+    });
     await interaction.editReply({
       content: `Failed to create debug verification: ${error.message}`,
       ephemeral: true
@@ -328,7 +381,14 @@ async function handleCheckVerification(interaction, pendingVerifications) {
         }
       } catch (error) {
         // Error checking existing verification
-        logger.error('Error checking existing verification:', error);
+        logger.error({
+          message: "Error checking existing verification",
+          error,
+          context: {
+            discordId,
+            actualScanRef
+          }
+        });
       }
 
       return interaction.editReply({
@@ -454,6 +514,16 @@ async function handleCheckVerification(interaction, pendingVerifications) {
           await deleteIdenfyData(actualScanRef);
           embed.addFields({ name: 'Data Deletion', value: 'iDenfy data deleted ✅', inline: true });
         } catch (deleteError) {
+          logger.error({
+            message: "Failed to delete iDenfy data",
+            error: deleteError,
+            context: {
+              discordId,
+              scanRef: actualScanRef,
+              pending,
+              verificationStatus: status,
+            }
+          });
           embed.addFields(
             { name: 'Data Deletion', value: 'Failed to delete iDenfy data ⚠️', inline: true },
             { name: 'Deletion Error', value: deleteError.message || 'Unknown error', inline: false }
@@ -487,6 +557,16 @@ async function handleCheckVerification(interaction, pendingVerifications) {
         await deleteIdenfyData(actualScanRef);
         embed.addFields({ name: 'Data Deletion', value: 'iDenfy data deleted ✅', inline: true });
       } catch (deleteError) {
+        logger.error({
+          message: "Failed to delete iDenfy data",
+          error: deleteError,
+          context: {
+            discordId,
+            scanRef: actualScanRef,
+            pending,
+            verificationStatus: status,
+          }
+        });
         embed.addFields(
           { name: 'Data Deletion', value: 'Failed to delete iDenfy data ⚠️', inline: true },
           { name: 'Deletion Error', value: deleteError.message || 'Unknown error', inline: false }
@@ -500,6 +580,13 @@ async function handleCheckVerification(interaction, pendingVerifications) {
 
     await interaction.editReply({ embeds: [embed], ephemeral: true });
   } catch (error) {
+    logger.error({
+      message: "Failed to check verification status",
+      error,
+      context: {
+        discordId,
+      }
+    });
     await interaction.editReply({
       content: `Failed to check verification status: ${error.message || 'Unknown error'}`,
       ephemeral: true

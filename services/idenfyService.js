@@ -49,72 +49,57 @@ async function createIdenfyVerification(discordId, ckey) {
       verificationUrl: `${config.IDENFY_BASE_URL}/api/v2/redirect?authToken=${response.data.authToken}`,
     };
   } catch (error) {
-    const logDetails = {
-      message: "Failed to create iDenfy verification",
-      errorResponse: error.response
-        ? {
-            status: error.response.status,
-            headers: error.response.headers,
-            data: error.response.data,
-          }
-        : null,
-      errorMessage: error.message,
-      stack: error.stack, 
-    };
-    logger.error("iDenfy verification error:", logDetails);
+    logger.error({
+      message: "iDenfy verification error",
+      error,
+      context: {
+        discordId,
+        ckey
+      }
+    });
     throw error;
   }
 }
 
 // Get verification status from iDenfy
 async function getIdenfyVerificationStatus(scanRef) {
-  try {
-    const response = await axios.post(`${config.IDENFY_BASE_URL}/api/v2/status`, {
-      scanRef: scanRef
-    }, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      auth: {
-        username: config.IDENFY_API_KEY,
-        password: config.IDENFY_API_SECRET
-      }
-    });
-    
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to get iDenfy verification status:', error.response?.data || error.message);
-    throw error;
-  }
+  const response = await axios.post(`${config.IDENFY_BASE_URL}/api/v2/status`, {
+    scanRef: scanRef
+  }, {
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    },
+    auth: {
+      username: config.IDENFY_API_KEY,
+      password: config.IDENFY_API_SECRET
+    }
+  });
+  
+  return response.data;
 }
 
 // Function to delete iDenfy verification data
 async function deleteIdenfyData(scanRef) {
-  try {
-    const response = await fetch(`${config.IDENFY_BASE_URL}/api/v2/delete`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${Buffer.from(`${config.IDENFY_API_KEY}:${config.IDENFY_API_SECRET}`).toString('base64')}`
-      },
-      body: JSON.stringify({
-        scanRef: scanRef
-      })
-    });
+  const response = await fetch(`${config.IDENFY_BASE_URL}/api/v2/delete`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${Buffer.from(`${config.IDENFY_API_KEY}:${config.IDENFY_API_SECRET}`).toString('base64')}`
+    },
+    body: JSON.stringify({
+      scanRef: scanRef
+    })
+  });
 
-    if (!response.ok) {
-      if (response.status !== 200) {
-        const errorData = await response.json();
-        throw new Error(`iDenfy deletion failed: ${errorData.message || 'Unknown error'}`);
-      }
+  if (!response.ok) {
+    if (response.status !== 200) {
+      const errorData = await response.json();
+      throw new Error(`iDenfy deletion failed: ${errorData.message || 'Unknown error'}`);
     }
-
-    logger.info(`Successfully deleted iDenfy data for scanRef: ${scanRef}`);
-  } catch (error) {
-    logger.error(`Failed to delete iDenfy data for scanRef ${scanRef}:`, error);
-    throw error;
   }
+
+  logger.info(`Successfully deleted iDenfy data for scanRef: ${scanRef}`);
 }
 
 module.exports = {

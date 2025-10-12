@@ -36,17 +36,12 @@ api.interceptors.response.use(
 
 // Authenticate with the API
 async function authenticateAPI() {
-  try {
-    const response = await axios.post(`${config.API_BASE_URL}/api/auth/login`, {
-      username: config.API_USERNAME,
-      password: config.API_PASSWORD
-    });
-    jwtToken = response.data.token;
-    logger.debug('Successfully authenticated with API');
-  } catch (error) {
-    logger.error('Failed to authenticate with API:', error.message);
-    throw error;
-  }
+  const response = await axios.post(`${config.API_BASE_URL}/api/auth/login`, {
+    username: config.API_USERNAME,
+    password: config.API_PASSWORD
+  });
+  jwtToken = response.data.token;
+  logger.debug('Successfully authenticated with API');
 }
 
 /**
@@ -59,7 +54,10 @@ async function checkDailyLimit() {
     const { recent_verifications } = response.data;
     return recent_verifications >= config.DAILY_VERIFICATION_LIMIT;
   } catch (error) {
-    logger.error('Failed to check daily limit:', error.message);
+    logger.error({
+      message: 'Failed to check daily limit',
+      error
+    });
     return false; // Allow verification on error
   }
 }
@@ -88,13 +86,8 @@ async function submitVerification(discordId, ckey, debugMode = false, scan_ref) 
     verificationData.verified_flags.debug = true;
   }
 
-  try {
-    const response = await api.post('/api/v1/verify', verificationData);
-    return response.data;
-  } catch (error) {
-    logger.error('Failed to submit verification:', error.message);
-    throw error;
-  }
+  const response = await api.post('/api/v1/verify', verificationData);
+  return response.data;
 }
 
 /**

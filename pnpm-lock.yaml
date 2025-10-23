@@ -29,6 +29,9 @@ importers:
       express:
         specifier: ^4.18.0
         version: 4.21.2
+      jwt-decode:
+        specifier: ^4.0.0
+        version: 4.0.0
       uuid:
         specifier: ^9.0.0
         version: 9.0.1
@@ -4492,6 +4495,8 @@ snapshots:
   json-stable-stringify-without-jsonify@1.0.1: {}
 
   json5@2.2.3: {}
+
+  jwt-decode@4.0.0: {}
 
   keyv@4.5.4:
     dependencies:
